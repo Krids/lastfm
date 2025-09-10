@@ -228,5 +228,8 @@ jspm_packages/
 
 # Yarn Integrity file
 .yarn-integrity
+# Large dataset files
 data/lastfm-dataset-1K.tar.gz
 data/*.tar.gz
+data/lastfm/lastfm-dataset-1k/userid-timestamp-artid-artname-traid-traname.tsv
+data/lastfm/lastfm-dataset-1k/userid-profile.tsv
