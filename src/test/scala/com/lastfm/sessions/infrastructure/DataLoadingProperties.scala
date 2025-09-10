@@ -282,15 +282,20 @@ class DataLoadingProperties extends AnyPropSpec with Matchers with ScalaCheckPro
    * Property tests for error resilience - each property focuses on one resilience aspect.
    */
   property("loading never returns null events") {
-    forAll(Gen.listOf(validListenEventGen)) { events =>
-      whenever(events.nonEmpty && events.size <= 30) {
-        withTempFile(events) { tempFile =>
-          val result = dataRepository.loadListenEvents(tempFile.toString)
-          
-          // Property: Result should never contain null events
-          result.isSuccess should be(true)
-          result.get should not contain null
-        }
+    // Use Gen.listOfN to ensure non-empty lists of controlled size
+    val nonNullEventListGen = for {
+      size <- Gen.choose(1, 15) // Generate 1-15 events
+      events <- Gen.listOfN(size, validListenEventGen)
+    } yield events
+    
+    forAll(nonNullEventListGen) { events =>
+      withTempFile(events) { tempFile =>
+        val result = dataRepository.loadListenEvents(tempFile.toString)
+        
+        // Property: Result should never contain null events
+        result.isSuccess should be(true)
+        result.get should have size events.size
+        result.get should not contain null
       }
     }
   }
