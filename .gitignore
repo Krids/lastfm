@@ -228,3 +228,5 @@ jspm_packages/
 
 # Yarn Integrity file
 .yarn-integrity
+data/lastfm-dataset-1K.tar.gz
+data/*.tar.gz
