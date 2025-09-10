@@ -1,0 +1,1 @@
+// SBT plugins configuration
