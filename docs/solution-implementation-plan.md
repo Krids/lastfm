@@ -2,7 +2,7 @@
 
 ## 📋 **Executive Summary**
 
-This document outlines a comprehensive implementation plan for analyzing LastFM user listening sessions using enterprise-grade software engineering practices. The solution employs Hexagonal Architecture, comprehensive testing strategies, and Spark optimization techniques to deliver a production-ready data engineering solution.
+This document outlines a comprehensive implementation plan for analyzing LastFM user listening sessions using advanced data engineering disciplines. The solution employs Hexagonal Architecture with multi-context pipeline design, comprehensive testing strategies, strategic Spark optimization, and data quality as a first-class engineering discipline to deliver a production-ready data engineering solution.
 
 ---
 
@@ -18,11 +18,14 @@ Analyze user listening behavior to identify the most popular songs within the lo
 - Demonstrate enterprise software engineering practices
 
 ### **Key Performance Indicators**
-- **Processing Time**: < 5 minutes for full dataset
-- **Memory Usage**: < 6GB RAM requirement
+- **Processing Time**: < 3 minutes for full dataset
+- **Memory Usage**: < 4GB RAM requirement
 - **Test Coverage**: 100% on business logic
 - **Code Quality**: Zero critical SonarQube issues
 - **Documentation**: Complete architectural and operational docs
+- **Data Quality Score**: > 95% with detailed validation metrics
+- **Cache Hit Ratio**: > 80% across pipeline stages
+- **Partition Efficiency**: Balanced load distribution across compute resources
 
 ---
 
@@ -100,19 +103,47 @@ Analyze user listening behavior to identify the most popular songs within the lo
 - Integration tests with real data samples
 - Performance benchmarking
 
+### **Epic 4: Data Quality Engineering**
+
+#### **User Story 4.1**: Comprehensive Data Quality Framework
+**As a** data quality engineer  
+**I want to** implement comprehensive data validation and quality metrics  
+**So that** data issues are detected, measured, and reported systematically
+
+**Acceptance Criteria**:
+- Validate data schema, formats, and business rules
+- Generate detailed data quality reports with metrics
+- Implement quality thresholds and alerting
+- Provide data quality dashboard and monitoring
+- Handle graceful degradation based on quality scores
+
+#### **User Story 4.2**: Multi-Context Pipeline Architecture  
+**As a** senior data engineer  
+**I want to** organize the pipeline into specialized contexts with proper separation of concerns  
+**So that** the solution demonstrates advanced architectural thinking and maintainability
+
+**Acceptance Criteria**:
+- Separate data quality, session analysis, and ranking contexts
+- Implement strategic caching between pipeline stages
+- Use appropriate partitioning strategies for each context
+- Provide context-specific error handling and recovery
+- Enable independent testing and deployment of contexts
+
 ---
 
 ## 🏗️ **Architecture Decisions & Rationale**
 
-### **Core Architecture Pattern: Hexagonal (Ports & Adapters)**
+### **Core Architecture Pattern: Hexagonal with Multi-Context Design**
 
 #### **Decision Rationale**
 - **Testability**: Mock external dependencies (Spark, file system) for unit testing
 - **Technology Independence**: Core logic doesn't depend on Spark specifics
-- **Maintainability**: Clear separation of concerns
+- **Maintainability**: Clear separation of concerns with context boundaries
+- **Scalability**: Context-based architecture supports team and system scaling
+- **Performance**: Strategic caching and optimization at context boundaries
 - **Interview Impact**: Demonstrates advanced software engineering skills
 
-#### **Architecture Layers**
+#### **Multi-Context Architecture Layers**
 ```
 ┌─────────────────────────────────────────────────────┐
 │                External Adapters                    │
@@ -129,14 +160,19 @@ Analyze user listening behavior to identify the most popular songs within the lo
 │         │                 │                 │       │
 │         └─────────────────┼─────────────────┘       │
 │                           │                         │
-│    ┌─────────────────────────────────────────────┐  │
-│    │           Core Domain (Hexagon)             │  │
-│    │                                             │  │
-│    │  • SessionCalculator                       │  │
-│    │  • SessionAnalyzer                         │  │
-│    │  • Domain Models                           │  │
-│    │  • Business Rules                          │  │
-│    └─────────────────────────────────────────────┘  │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │        Multi-Context Core (Hexagon)             │ │
+│  │                                                 │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌───────────┐  │ │
+│  │  │   Data      │ │  Session    │ │  Ranking  │  │ │
+│  │  │  Quality    │ │  Analysis   │ │  Context  │  │ │
+│  │  │  Context    │ │  Context    │ │           │  │ │
+│  │  └─────────────┘ └─────────────┘ └───────────┘  │ │
+│  │                                                 │ │
+│  │  • SessionCalculator • DataQualityMetrics      │ │
+│  │  • SessionAnalyzer   • Strategic Caching       │ │
+│  │  • Domain Models     • Business Rules          │ │
+│  └─────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -167,9 +203,9 @@ Analyze user listening behavior to identify the most popular songs within the lo
 
 ---
 
-## ⚡ **Spark Optimization Strategy**
+## ⚡ **Advanced Spark Optimization Strategy**
 
-### **Critical Optimization 1: Partitioning by UserId**
+### **Critical Optimization 1: Environment-Aware Partitioning**
 
 #### **Problem Without Partitioning**
 ```
@@ -184,24 +220,102 @@ Session Calculation Requires:
 - Window functions for time gaps → EVEN MORE SHUFFLING
 ```
 
-#### **Solution: Custom Partitioning**
-```
+#### **Solution: Environment-Aware Custom Partitioning**
+```scala
+object PartitioningStrategy {
+  def calculateOptimalPartitions(environment: String, userCount: Int): Int = {
+    environment match {
+      case "local" =>
+        val cores = Runtime.getRuntime.availableProcessors()
+        val basedOnCores = cores * 3  // 3x cores for I/O operations
+        val basedOnUsers = userCount / 50  // ~50 users per partition
+        Math.max(basedOnCores, basedOnUsers)  // Typically 16-24 partitions
+        
+      case "cluster" =>
+        Math.max(200, userCount / 10)  // 10 users per partition in cluster
+    }
+  }
+}
+
+// Local: 24 partitions (optimal for 8 cores)
 Custom Partitioning by UserId:
-Partition 1: [user_001: all tracks, user_002: all tracks, ...]
-Partition 2: [user_025: all tracks, user_026: all tracks, ...]
-Partition 3: [user_050: all tracks, user_051: all tracks, ...]
+Partition 1: [user_001: all tracks, user_002: all tracks, ...] (~42 users)
+Partition 2: [user_043: all tracks, user_044: all tracks, ...] (~42 users)
+Partition 3: [user_085: all tracks, user_086: all tracks, ...] (~42 users)
 
 Session Calculation Benefits:
 - No shuffle needed for groupBy(userId) → ZERO network I/O
 - All user tracks already co-located → Sort happens locally
 - Session gaps calculated within partition → No cross-partition communication
+- Optimal CPU utilization: 100% across all cores
 ```
 
 #### **Performance Impact**
 - **Without partitioning**: ~10-15 minutes processing time
-- **With userId partitioning**: ~2-3 minutes processing time
+- **With environment-aware partitioning**: ~2-3 minutes processing time
 - **Network I/O reduction**: 95%+ less data movement
-- **Memory efficiency**: Better cache locality
+- **Memory efficiency**: Better cache locality and optimal partition sizing
+- **CPU utilization**: 100% across all available cores
+
+### **Critical Optimization 2: Strategic Multi-Level Caching**
+
+#### **Context-Boundary Caching Architecture**
+```scala
+class CacheStrategy {
+  // Level 1: After expensive repartitioning
+  val repartitionedData = rawEvents
+    .repartition(optimalPartitions, col("userId"))
+    .cache()  // MEMORY_ONLY for hot data
+  
+  // Level 2: After data quality validation
+  val qualityValidatedData = repartitionedData
+    .transform(dataQualityValidation)
+    .persist(StorageLevel.MEMORY_AND_DISK_SER)
+    
+  // Level 3: After session calculation
+  val sessionsWithMetadata = qualityValidatedData
+    .transform(sessionCalculation)
+    .cache()  // Multiple downstream consumers
+    
+  // Level 4: Final output preparation
+  val finalResults = topSongsAggregation
+    .coalesce(1)  // Single output file
+}
+```
+
+#### **Performance Impact of Strategic Caching**
+```
+Traditional Pipeline (No Strategic Caching):
+├── Recompute repartitioning for each operation
+├── Recalculate quality validation multiple times
+├── Processing time: 5-8 minutes
+
+Multi-Level Caching Pipeline:
+├── Context 1 (Data Quality): ~45 seconds + persist
+├── Context 2 (Session Analysis): ~90 seconds + cache
+├── Context 3 (Ranking & Output): ~45 seconds + coalesce
+├── Cache efficiency: 80%+ hit ratio
+└── Total processing time: ~3 minutes (40% improvement)
+```
+
+### **Critical Optimization 3: Smart Repartition vs Coalesce**
+
+#### **Decision Matrix**
+```scala
+// ✅ REPARTITION: Custom partitioning or increasing partitions
+val userPartitioned = rawDF.repartition(24, col("userId"))  // Custom partitioning
+val moreParallel = smallDF.repartition(24)  // Increase parallelism
+
+// ✅ COALESCE: Reducing partitions without shuffle
+val singleOutput = results.coalesce(1)  // Output file generation
+val fewerPartitions = heavyDF.coalesce(8)  // Reduce from 24 to 8
+
+// ❌ AVOID: Coalesce for increasing partitions
+val wrong = smallDF.coalesce(50)  // Creates uneven partition distribution
+
+// ❌ AVOID: Repartition just for reduction
+val wasteful = df.repartition(8)  // Use coalesce(8) instead
+```
 
 ### **Optimization Decision: Broadcast Join Analysis**
 
@@ -223,10 +337,12 @@ val enrichedSessions = sessions.join(broadcast(userProfiles), "userid")
 - Can be added later if requirements expand
 
 ### **Final Optimization Strategy**
-1. **Partition by UserId**: Essential for efficient session calculation
-2. **Cache strategically**: Cache repartitioned dataset before session analysis
-3. **Avoid unnecessary joins**: Keep pipeline focused on core requirements
-4. **Resource management**: Configure dynamic allocation appropriately
+1. **Environment-Aware Partitioning**: Match partitions to compute resources (16-24 local, 200+ cluster)
+2. **Strategic Multi-Level Caching**: Cache at context boundaries for maximum reuse
+3. **Smart Repartition/Coalesce**: Use appropriate tool for each operation
+4. **Context Separation**: Specialized optimization per pipeline stage
+5. **Data Quality Integration**: Quality validation with performance optimization
+6. **Resource Management**: Context-specific Spark configurations
 
 ---
 
@@ -358,64 +474,68 @@ val enrichedSessions = sessions.join(broadcast(userProfiles), "userid")
 
 ## 📅 **Implementation Timeline**
 
-### **Phase 1: Domain Foundation (Core Business Logic)**
-**Objective**: Implement and test business logic with zero infrastructure dependencies
+### **Phase 1: Domain Foundation with Quality Integration**
+**Objective**: Implement core domain models and business logic with integrated data quality
 
 #### **Morning Tasks**:
-- **Project Setup**: Initialize SBT project with hexagonal architecture structure
-- **Domain Models**: Implement ListenEvent, UserSession, SessionAnalysis models
-- **Port Interfaces**: Define business logic contracts (SessionCalculatorPort, DataRepositoryPort)
+- **Enhanced Domain Models**: `ListenEvent`, `UserSession`, `SessionAnalysis`, `DataQualityMetrics`
+- **Business Logic**: `SessionCalculator`, `SessionAnalyzer` with quality validation
+- **Quality Framework**: Quality rules, thresholds, validation logic, and metrics collection
 
 #### **Afternoon Tasks**:
-- **Core Logic**: Implement SessionCalculator and SessionAnalyzer
-- **Unit Testing**: Comprehensive test coverage for all business logic
+- **Port Interfaces**: All business contracts including quality reporting interfaces
+- **Unit Testing**: Comprehensive test coverage including quality validation scenarios
+- **Property-Based Testing**: ScalaCheck for session invariants and quality constraints
 
-**Success Metrics**: 100% domain logic test coverage, all edge cases handled
+**Success Metrics**: 100% domain logic test coverage, quality framework implemented
 
-### **Phase 2: Infrastructure & Data Pipeline**
-**Objective**: Implement Spark integration and data loading capabilities
+### **Phase 2: Multi-Context Pipeline Architecture**
+**Objective**: Implement advanced pipeline design with strategic optimization
 
 #### **Morning Tasks**:
-- **Spark Setup**: Session management, configuration, optimization settings
-- **Data Repository**: CSV loading with schema validation
-- **Error Handling**: Graceful failure handling and data quality checks
+- **Context Implementation**: `DataQualityContext`, `SessionAnalysisContext`, `RankingContext`
+- **Partitioning Strategy**: Environment-aware optimal partitioning calculation
+- **Cache Framework**: Strategic multi-level caching with performance monitoring
+- **Configuration Management**: Externalized Spark and pipeline configuration
 
 #### **Afternoon Tasks**:
-- **Integration Testing**: Test Spark components with sample data
-- **Performance Optimization**: Partitioning, caching, memory management
-- **Pipeline Assembly**: End-to-end data flow implementation
+- **Integration Testing**: Context-level testing with real data samples
+- **Performance Optimization**: Cache hit ratio monitoring and partition efficiency tuning
+- **Quality Integration**: Seamless quality validation integrated across pipeline stages
 
-**Success Metrics**: Process full dataset successfully, integration tests passing
+**Success Metrics**: Multi-context architecture implemented, cache efficiency > 80%
 
-### **Phase 3: Application Assembly & Results**
-**Objective**: Complete application with proper error handling and output generation
+### **Phase 3: Infrastructure & Optimization Implementation**
+**Objective**: Complete infrastructure with production-grade optimization
 
 #### **Morning Tasks**:
-- **Application Layer**: Orchestration and use case implementation
-- **Configuration**: CLI interface and parameter management
-- **Error Handling**: Comprehensive exception handling and logging
+- **Spark Infrastructure**: `SparkSessionManager`, `PartitioningStrategy`, optimized configurations
+- **Application Orchestration**: Use cases connecting all contexts with error handling
+- **Output Generation**: TSV generation with coalesce optimization and quality reporting
+- **Resource Management**: Dynamic allocation and memory optimization
 
 #### **Afternoon Tasks**:
-- **Output Generation**: TSV formatting and file writing
-- **Performance Testing**: Full dataset processing and optimization
-- **Quality Assurance**: Results validation and correctness verification
+- **Performance Benchmarking**: Full dataset processing with optimization analysis
+- **Quality Dashboard**: Data quality metrics collection and reporting infrastructure
+- **End-to-End Testing**: Complete pipeline validation with performance verification
 
-**Success Metrics**: Generate correct output file, meet performance requirements
+**Success Metrics**: Processing time < 3 minutes, data quality score > 95%
 
-### **Phase 4: Production Readiness & Delivery**
-**Objective**: Package, document, and prepare for production deployment
+### **Phase 4: Production Readiness & Excellence**
+**Objective**: Finalize production deployment with comprehensive documentation
 
 #### **Morning Tasks**:
-- **Containerization**: Docker packaging with optimized image
-- **Documentation**: Architecture, deployment, and operational guides
-- **Testing Validation**: Final test suite execution and validation
+- **Docker Infrastructure**: Multi-stage build with performance-optimized Spark configuration
+- **Monitoring Integration**: Performance metrics, quality monitoring, and alerting
+- **Documentation**: Complete architecture, operations, and troubleshooting guides
+- **Quality Assurance**: Final validation with data quality standards and procedures
 
 #### **Afternoon Tasks**:
-- **Benchmarking**: Performance metrics collection and analysis
-- **Code Review**: Quality assurance and cleanup
-- **Delivery Package**: Final packaging and submission preparation
+- **Performance Analysis**: Cache efficiency, partition optimization, and scaling analysis
+- **Production Validation**: Final quality gates, deployment readiness, and handover
+- **Knowledge Transfer**: Complete documentation package and operational procedures
 
-**Success Metrics**: Deployable container, comprehensive documentation, benchmarked performance
+**Success Metrics**: Production-ready deployment, comprehensive monitoring, knowledge transfer complete
 
 ---
 
@@ -467,11 +587,12 @@ val enrichedSessions = sessions.join(broadcast(userProfiles), "userid")
 
 ## 🎯 **Interview Success Factors**
 
-### **Technical Sophistication Demonstrated**
-- **Advanced Architecture**: Hexagonal pattern shows senior-level thinking
-- **Comprehensive Testing**: 100% coverage with property-based testing
-- **Production Mindset**: Docker, documentation, performance considerations
-- **Technology Mastery**: Deep Spark knowledge with optimization techniques
+### **Advanced Data Engineering Disciplines Demonstrated**
+- **Multi-Context Architecture**: Shows understanding of separation of concerns at enterprise scale
+- **Strategic Caching**: Demonstrates deep performance optimization expertise
+- **Environment-Aware Partitioning**: Shows real-world production considerations and resource management
+- **Data Quality Engineering**: Proves understanding of data reliability and quality assurance principles
+- **Spark Optimization Mastery**: Shows expertise in repartition vs coalesce and cache strategies
 
 ### **Business Understanding**
 - **Problem Decomposition**: Clear user stories and acceptance criteria
@@ -479,33 +600,34 @@ val enrichedSessions = sessions.join(broadcast(userProfiles), "userid")
 - **Scalability Awareness**: Honest about limitations with clear upgrade path
 - **Delivery Excellence**: Complete, documented, deployable solution
 
-### **Engineering Excellence Indicators**
-- **Clean Code Principles**: SOLID principles, dependency inversion
-- **Testing Expertise**: Unit, integration, property-based, and performance testing
-- **DevOps Integration**: Containerization, deployment automation
-- **Documentation Quality**: Clear architecture decisions and trade-offs
+### **Senior-Level Technical Sophistication**
+- **Architecture Patterns**: Sophisticated hexagonal architecture with multi-context design
+- **Performance Engineering**: Strategic caching, intelligent partitioning, and resource optimization
+- **Quality Framework**: Comprehensive data quality engineering with metrics and monitoring
+- **Production Readiness**: Complete monitoring, alerting, and operational procedures
+- **Code Excellence**: Clean, testable, maintainable implementation with comprehensive testing
 
 ---
 
 ## 📊 **Expected Deliverables**
 
 ### **Code Artifacts**
-- ✅ Complete Scala application with hexagonal architecture
-- ✅ Comprehensive test suite (100+ tests)
-- ✅ Docker container with optimized configuration
-- ✅ Build scripts and deployment automation
+- ✅ Complete multi-context Scala application with advanced Spark optimization
+- ✅ Comprehensive test suite (150+ tests) covering domain, integration, and quality scenarios
+- ✅ Docker container with performance-optimized configuration and resource management
+- ✅ Advanced monitoring and quality reporting capabilities
 
 ### **Documentation**
-- ✅ Architecture decision records
-- ✅ API documentation (ScalaDoc)
-- ✅ Deployment and operational guides
-- ✅ Performance benchmarking results
+- ✅ Multi-context architecture documentation with design decisions and trade-offs
+- ✅ Spark optimization strategy documentation with performance analysis
+- ✅ Data quality framework documentation with operational procedures
+- ✅ Performance benchmarking results with scaling recommendations
 
 ### **Results**
-- ✅ `top_songs.tsv` file with exact format specified
-- ✅ Performance metrics and analysis
-- ✅ Data quality report
-- ✅ Scalability recommendations
+- ✅ `top_songs.tsv` file generated with optimal processing performance (< 3 minutes)
+- ✅ Comprehensive data quality report with detailed metrics and recommendations
+- ✅ Performance analysis report with cache efficiency and optimization metrics
+- ✅ Production deployment guide with environment-specific configuration and scaling guidance
 
 ---
 
@@ -513,13 +635,13 @@ val enrichedSessions = sessions.join(broadcast(userProfiles), "userid")
 
 This implementation plan delivers a **production-ready data engineering solution** that demonstrates:
 
-- **Senior-level architecture thinking** with hexagonal design
-- **Comprehensive quality assurance** through extensive testing
-- **Production operations mindset** with containerization and monitoring
-- **Deep technical knowledge** of Spark optimization techniques
-- **Business focus** with clear user stories and success criteria
+- **Advanced architectural thinking** with multi-context hexagonal design
+- **Comprehensive performance optimization** through strategic caching and intelligent partitioning
+- **Production-grade quality engineering** with integrated data quality framework
+- **Deep technical expertise** in Spark optimization and resource management
+- **Enterprise readiness** with monitoring, documentation, and operational procedures
 
-The solution positions the implementer as a **data engineering expert** who understands both technical excellence and business value delivery.
+The solution positions the implementer as a **senior data engineering expert** who understands advanced architectural patterns, performance optimization, data quality engineering, and production operations at scale.
 
 ---
 
