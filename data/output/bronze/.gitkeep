@@ -1,0 +1,13 @@
+# Bronze Layer (Raw Data Staging)
+#
+# This directory contains raw data staging area for the 
+# Data Quality Context input processing.
+#
+# Potential artifacts (excluded from git):
+# - *.tsv: Staged raw data for processing
+# - *.json: Raw data metadata and lineage information
+#
+# Purpose: Optional staging area for raw data preprocessing and validation
+# Note: Primary Bronze data is stored in data/lastfm/lastfm-dataset-1k/
+#
+# Medallion Architecture: BRONZE → Silver → Gold → Results

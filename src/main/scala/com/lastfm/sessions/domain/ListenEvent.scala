@@ -5,6 +5,7 @@ import java.time.Instant
 /**
  * Domain model representing a single listening event from Last.fm data.
  * 
+ * Enhanced with data quality improvements and track identity resolution.
  * Validates all critical fields at construction time to ensure data integrity.
  * 
  * @param userId Unique identifier for the user (required, non-null, non-empty)
@@ -13,6 +14,7 @@ import java.time.Instant
  * @param artistName Name of the artist (required, non-null, non-empty)
  * @param trackId Optional MusicBrainz track ID  
  * @param trackName Name of the track (required, non-null, non-empty)
+ * @param trackKey Deterministic track identifier (MBID preferred, fallback to "artist — track")
  * @throws IllegalArgumentException if any required field is null, empty, or blank
  */
 case class ListenEvent(
@@ -21,7 +23,8 @@ case class ListenEvent(
   artistId: Option[String],
   artistName: String,
   trackId: Option[String],
-  trackName: String
+  trackName: String,
+  trackKey: String
 ) {
   // Validate critical fields at construction time
   require(userId != null, "userId cannot be null")
@@ -37,17 +40,24 @@ case class ListenEvent(
   require(trackName != null, "trackName cannot be null")
   require(trackName.nonEmpty, "trackName cannot be empty")
   require(!trackName.isBlank, "trackName cannot be blank")
+  
+  require(trackKey != null, "trackKey cannot be null")
+  require(trackKey.nonEmpty, "trackKey cannot be empty")
+  require(!trackKey.isBlank, "trackKey cannot be blank")
 }
 
 object ListenEvent {
   /**
    * Creates a minimal listen event with only required fields.
    * 
+   * Automatically generates trackKey using the fallback strategy (artist — track)
+   * since no MBIDs are provided.
+   * 
    * @param userId Unique identifier for the user
    * @param timestamp When the track was played
    * @param artistName Name of the artist
    * @param trackName Name of the track
-   * @return Validated ListenEvent instance
+   * @return Validated ListenEvent instance with generated trackKey
    * @throws IllegalArgumentException if validation fails
    */
   def minimal(
@@ -56,13 +66,16 @@ object ListenEvent {
     artistName: String,
     trackName: String
   ): ListenEvent = {
+    val trackKey = LastFmDataValidation.generateTrackKey(None, artistName, trackName)
+    
     ListenEvent(
       userId = userId,
       timestamp = timestamp,
       artistId = None,
       artistName = artistName,
       trackId = None,
-      trackName = trackName
+      trackName = trackName,
+      trackKey = trackKey
     )
   }
 }

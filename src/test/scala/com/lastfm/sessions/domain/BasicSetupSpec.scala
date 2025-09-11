@@ -46,7 +46,8 @@ class BasicSetupSpec extends AnyFlatSpec with Matchers {
       artistId = Some("artist-123"),
       artistName = "Deep Dish",
       trackId = Some("track-456"),
-      trackName = "Fuck Me Im Famous"
+      trackName = "Fuck Me Im Famous",
+      trackKey = "track-456" // Use track MBID as key when available
     )
     
     event.userId should be("user_000001")
