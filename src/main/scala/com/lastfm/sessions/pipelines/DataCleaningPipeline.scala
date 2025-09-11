@@ -223,7 +223,7 @@ object DataCleaningPipeline {
         maxSuspiciousUserRatio = 5.0
       ),
       sparkConfig = SparkConfig(
-        partitions = cores * 3, // 3x cores for I/O operations
+        partitions = 16, // Optimal for 1K users session analysis (~62 users per partition)
         timeZone = "UTC",
         adaptiveEnabled = true
       )

@@ -43,6 +43,8 @@ data/output/**/*_spark_output/
 
 # Keep sample data for testing and documentation
 !data/sample/
+!data/sample/*.tsv             # Keep sample TSV files for testing
+!data/sample/*.json            # Keep sample metadata files
 
 # ===========================
 # SBT / Scala Build Artifacts

@@ -1,6 +1,6 @@
 package com.lastfm.sessions.orchestration
 
-import com.lastfm.sessions.pipelines.{PipelineConfig, DataCleaningPipeline}
+import com.lastfm.sessions.pipelines.{PipelineConfig, DataCleaningPipeline, SessionAnalysisPipeline}
 import com.lastfm.sessions.domain.DataQualityMetrics
 import org.apache.spark.sql.SparkSession
 import scala.util.{Try, Success, Failure}
@@ -77,12 +77,32 @@ object PipelineOrchestrator {
 
   /**
    * Executes Session Analysis Pipeline (Silver → Gold transformation).
-   * Future implementation - currently returns placeholder.
+   * 
+   * Implements comprehensive session analysis processing:
+   * - Loads cleaned listening events from Silver layer
+   * - Applies 20-minute gap algorithm for session calculation
+   * - Generates statistical analysis and top sessions ranking
+   * - Persists structured Gold layer artifacts for downstream consumption
    */
   private def executeSessionAnalysisPipeline(config: PipelineConfig): PipelineExecutionResult = {
-    println("🔄 Session Analysis Pipeline - Not yet implemented")
-    println("   Next: UserSession domain model → SessionCalculator → Session analysis")
-    PipelineExecutionResult.SessionAnalysisCompleted
+    println("🔄 Executing Session Analysis Pipeline (Silver → Gold)")
+    
+    using(SparkSessionManager.createProductionSession()) { implicit spark =>
+      val pipeline = new SessionAnalysisPipeline(config)
+      val result = pipeline.execute()
+      
+      result match {
+        case Success(analysis) =>
+          println(s"✅ Session analysis completed successfully")
+          println(f"   Sessions Generated: ${analysis.totalSessions}")
+          println(f"   Users Analyzed: ${analysis.uniqueUsers}")
+          println(f"   Quality Score: ${analysis.qualityScore}%.2f%%")
+          PipelineExecutionResult.SessionAnalysisCompleted
+          
+        case Failure(exception) =>
+          throw new RuntimeException("Session analysis pipeline failed", exception)
+      }
+    }
   }
 
   /**

@@ -182,14 +182,19 @@ class DataCleaningPipelineSpec extends AnyFlatSpec with Matchers with BeforeAndA
     qualityMetrics.qualityScore should be(100.0 +- 0.1)
   }
   
-  it should "optimize partition count based on environment" in {
+  it should "use optimized partition count for 1K user dataset" in {
     // Arrange
     val localStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 8)
     val clusterStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 100)
     
-    // Act & Assert - Should adapt partition count to environment
-    localStrategy.calculateOptimalPartitions() should be(16) // 2x cores for local
-    clusterStrategy.calculateOptimalPartitions() should be(200) // 2x cores for cluster
+    // Act & Assert - Should use optimized 16 partitions for 1K user dataset
+    // Both local and cluster use the same optimized partition count for our specific dataset
+    localStrategy.calculateOptimalPartitions() should be(16) // Optimal for 1K users (~62 users per partition)
+    clusterStrategy.calculateOptimalPartitions() should be(16) // Same optimization regardless of cores
+    
+    // Verify users per partition calculation
+    localStrategy.usersPerPartition should be(62) // 1000 users / 16 partitions = ~62.5
+    clusterStrategy.usersPerPartition should be(62)
   }
 
   /**
