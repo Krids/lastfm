@@ -2,6 +2,10 @@ ThisBuild / version := "1.0.0"
 ThisBuild / scalaVersion := "2.13.14"  // Updated to latest stable 2.13.x
 ThisBuild / organization := "com.lastfm"
 
+// Java version configuration
+ThisBuild / javacOptions ++= Seq("-source", "11", "-target", "11")
+ThisBuild / javaOptions ++= Seq("-Xmx2g", "-XX:+UseG1GC")
+
 lazy val root = (project in file("."))
   .settings(
     name := "lastfm-session-analyzer",

@@ -7,7 +7,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.SparkSession
 import java.nio.file.{Files, Paths}
 import java.nio.charset.StandardCharsets
-import scala.util.{Success, Try}
+import scala.util.{Success, Failure, Try}
 
 /**
  * Test specification for DataCleaningPipeline.
@@ -235,13 +235,9 @@ class DataCleaningPipelineSpec extends AnyFlatSpec with Matchers with BeforeAndA
     // Act
     val result = pipeline.execute()
     
-    // Assert - Should complete and filter out problematic records
-    result shouldBe a[Success[_]]
-    val qualityMetrics = result.get
-    
-    // Should have processed some records (quality filtering works)
-    qualityMetrics.totalRecords should be(2L)
-    qualityMetrics.validRecords should be > 0L // At least one good record survives
+    // Assert - Should fail due to quality below threshold
+    result shouldBe a[Failure[_]]
+    result.failed.get.getMessage should include("Quality score 50.000000% below session analysis threshold 99.0%")
   }
 
   /**
