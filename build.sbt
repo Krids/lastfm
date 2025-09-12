@@ -32,8 +32,100 @@ lazy val root = (project in file("."))
       "-language:postfixOps"
     ),
     
-    // Test configuration
-    Test / testOptions += Tests.Argument("-oDF"),
+    // Test configuration with safety validation
+    Test / testOptions ++= Seq(
+      Tests.Argument("-oDF"),
+      Tests.Setup { () =>
+        println("🔍 Validating test environment safety before test execution...")
+        
+        // Ensure test directories exist
+        val testDirs = Seq("data/test", "data/test/bronze", "data/test/silver", "data/test/gold", "data/test/results")
+        testDirs.foreach { dir =>
+          val path = java.nio.file.Paths.get(dir)
+          if (!java.nio.file.Files.exists(path)) {
+            java.nio.file.Files.createDirectories(path)
+            println(s"📁 Created test directory: $dir")
+          }
+        }
+        
+        // Critical safety check: Validate no production contamination before tests
+        val productionDirs = Seq("data/output/bronze", "data/output/silver", "data/output/gold", "data/output/results")
+        val contaminatedFiles = productionDirs.flatMap { dir =>
+          val dirPath = java.nio.file.Paths.get(dir)
+          if (java.nio.file.Files.exists(dirPath) && java.nio.file.Files.isDirectory(dirPath)) {
+            scala.util.Try {
+              java.nio.file.Files.list(dirPath)
+                .filter { p =>
+                  val fileName = p.getFileName.toString.toLowerCase
+                  fileName.contains("test") || fileName.startsWith("temp-") || fileName.startsWith("tmp-") ||
+                  fileName.contains("spec") || fileName.contains("fixture")
+                }
+                .toArray
+                .map(_.toString)
+            }.getOrElse(Array.empty[String])
+          } else {
+            Array.empty[String]
+          }
+        }
+        
+        if (contaminatedFiles.nonEmpty) {
+          val contaminationDetails = contaminatedFiles.mkString("\n  - ")
+          throw new RuntimeException(
+            s"🚨 CRITICAL: Production contamination detected before test execution!\n" +
+            s"The following test artifacts were found in production directories:\n  - $contaminationDetails\n\n" +
+            s"This indicates previous test safety violations. Clean these files before running tests:\n" +
+            s"  rm -rf ${contaminatedFiles.mkString(" ")}\n\n" +
+            s"Future tests will be isolated to data/test/ to prevent this issue."
+          )
+        }
+        
+        println("✅ Test environment safety validated - no production contamination detected")
+        println("🧪 Tests will execute in isolated environment: data/test/")
+      },
+      Tests.Cleanup { () =>
+        println("🧹 Post-test safety validation and cleanup...")
+        
+        // Verify no production contamination occurred during test execution
+        val productionDirs = Seq("data/output/bronze", "data/output/silver", "data/output/gold", "data/output/results")
+        val newContamination = productionDirs.flatMap { dir =>
+          val dirPath = java.nio.file.Paths.get(dir)
+          if (java.nio.file.Files.exists(dirPath) && java.nio.file.Files.isDirectory(dirPath)) {
+            scala.util.Try {
+              java.nio.file.Files.list(dirPath)
+                .filter { p =>
+                  val fileName = p.getFileName.toString.toLowerCase
+                  fileName.contains("test") || fileName.startsWith("temp-") || fileName.startsWith("tmp-")
+                }
+                .toArray
+                .map(_.toString)
+            }.getOrElse(Array.empty[String])
+          } else {
+            Array.empty[String]
+          }
+        }
+        
+        if (newContamination.nonEmpty) {
+          val contaminationDetails = newContamination.mkString("\n  - ")
+          System.err.println(
+            s"🚨 CRITICAL: Test execution contaminated production directories!\n" +
+            s"Contaminated files:\n  - $contaminationDetails\n\n" +
+            s"This indicates a test safety violation. Immediate cleanup required."
+          )
+          
+          // Attempt automatic cleanup (with caution)
+          newContamination.foreach { filePath =>
+            scala.util.Try {
+              java.nio.file.Files.deleteIfExists(java.nio.file.Paths.get(filePath))
+              println(s"🧹 Cleaned contaminated file: $filePath")
+            }.recover {
+              case ex => System.err.println(s"⚠️ Could not clean $filePath: ${ex.getMessage}")
+            }
+          }
+        } else {
+          println("✅ Test cleanup validated - no production contamination detected")
+        }
+      }
+    ),
     Test / logBuffered := false,
     Test / parallelExecution := false,
     

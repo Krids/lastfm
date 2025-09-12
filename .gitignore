@@ -280,7 +280,18 @@ data/*.tar.gz
 data/lastfm/lastfm-dataset-1k/userid-timestamp-artid-artname-traid-traname.tsv
 data/lastfm/lastfm-dataset-1k/userid-profile.tsv
 
-# Test artifacts directory
+# ===========================
+# Test Data Isolation - CRITICAL PROTECTION
+# ===========================
+# Test artifacts directory - completely isolated from production
 data/test/
+!data/test/.gitkeep
 /tmp/orchestration-test/
 /tmp/parquet-test/
+
+# Prevent any test artifacts from contaminating production directories
+data/output/*/test-*
+data/output/*/*/test-*
+data/output/**/*test*
+data/output/**/temp-*
+data/output/**/tmp-*

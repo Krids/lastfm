@@ -1,13 +1,16 @@
 package com.lastfm.sessions.domain
 
+import com.lastfm.sessions.common.{Constants, ConfigurableConstants}
+import com.lastfm.sessions.common.traits.MetricsCalculator
+
 /**
  * Immutable value object representing final ranking results.
  * 
  * Aggregates top sessions and tracks with processing metadata.
  * Provides comprehensive audit trail and quality metrics.
  * 
- * @param topSessions Ranked list of top sessions (max 50)
- * @param topTracks Ranked list of top tracks (max 10)
+ * @param topSessions Ranked list of top sessions (configurable limit)
+ * @param topTracks Ranked list of top tracks (configurable limit)
  * @param totalSessionsAnalyzed Total number of sessions processed
  * @param totalTracksAnalyzed Total number of tracks processed
  * @param processingTimeMillis Processing duration in milliseconds
@@ -30,10 +33,10 @@ case class RankingResult(
   require(topTracks != null, "Top tracks must not be null")
   
   // Validation: Size constraints per business requirements
-  require(topSessions.size <= 50, 
-    s"Top sessions must not exceed 50, got: ${topSessions.size}")
-  require(topTracks.size <= 10, 
-    s"Top tracks must not exceed 10, got: ${topTracks.size}")
+  require(topSessions.size <= ConfigurableConstants.SessionAnalysis.TOP_SESSIONS_COUNT.value, 
+    s"Top sessions must not exceed ${ConfigurableConstants.SessionAnalysis.TOP_SESSIONS_COUNT.value}, got: ${topSessions.size}")
+  require(topTracks.size <= ConfigurableConstants.SessionAnalysis.TOP_TRACKS_COUNT.value, 
+    s"Top tracks must not exceed ${ConfigurableConstants.SessionAnalysis.TOP_TRACKS_COUNT.value}, got: ${topTracks.size}")
   
   // Validation: Counts must be non-negative
   require(totalSessionsAnalyzed >= 0, 
@@ -71,17 +74,17 @@ case class RankingResult(
     } else 0.0
   
   /**
-   * Data compression ratio (total tracks to top 10).
+   * Data compression ratio (total tracks to top N tracks).
    */
   def compressionRatio: Double = 
     if (topTracks.nonEmpty) {
-      totalTracksAnalyzed.toDouble / 10
+      totalTracksAnalyzed.toDouble / ConfigurableConstants.SessionAnalysis.TOP_TRACKS_COUNT.value
     } else 0.0
   
   /**
    * Determines if results meet quality threshold.
    */
-  def isHighQuality: Boolean = qualityScore >= 95.0
+  def isHighQuality: Boolean = qualityScore >= ConfigurableConstants.DataQuality.SESSION_ANALYSIS_MIN_QUALITY.value
   
   /**
    * Generates comprehensive audit summary.

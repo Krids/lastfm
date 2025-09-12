@@ -2,6 +2,43 @@
 
 This document provides instructions for running the LastFM Session Analysis pipeline using a simple Docker container for local development.
 
+## 🆕 Recent Improvements
+
+**Multi-Stage Dockerfile**: ~50% smaller final image size
+- Builder stage with full JDK for compilation
+- Runtime stage with minimal JRE for execution
+- Non-root user execution for security
+
+**Environment-Based Configuration**: No more hardcoded settings
+- Configurable memory, CPU, and Spark settings
+- Create `.env` file for custom configuration
+- Separate test and production configurations
+
+**Better Monitoring**: Health checks and resource visibility
+- Built-in health checks for container monitoring
+- Detailed resource usage reporting
+- Enhanced logging with configuration details
+
+## ⚙️ Environment Configuration
+
+Create a `.env` file in the project root for custom settings:
+
+```bash
+# Resource allocation
+MEM_LIMIT=12g
+CPU_LIMIT=6
+JAVA_OPTS=-Xmx8g -XX:+UseG1GC
+
+# Spark configuration  
+SPARK_PARTITIONS=16
+SPARK_UI_PORT=4040
+
+# Pipeline parameters
+SESSION_GAP_MINUTES=20
+TOP_SESSIONS=50
+TOP_TRACKS=10
+```
+
 ## 🚀 Quick Start
 
 ### Option 1: Simple Script (Recommended)
@@ -17,6 +54,9 @@ This document provides instructions for running the LastFM Session Analysis pipe
 
 # Run tests
 ./scripts/docker-local.sh test
+
+# Interactive Scala console
+./scripts/docker-local.sh shell
 ```
 
 ### Option 2: Docker Compose (Single Service)
@@ -26,6 +66,12 @@ docker-compose -f docker-compose.local.yml up
 
 # Run specific pipeline
 docker-compose -f docker-compose.local.yml run lastfm data-cleaning
+
+# Run tests with optimized test container
+docker-compose -f docker-compose.local.yml run lastfm-test
+
+# Health check
+docker-compose -f docker-compose.local.yml run lastfm health
 ```
 
 ### Option 3: Direct Docker Command

@@ -2,49 +2,68 @@ package com.lastfm.sessions.config
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import com.lastfm.sessions.testutil.{BaseTestSpec, TestConfiguration}
 import scala.util.{Try, Success, Failure}
 
-class AppConfigurationSpec extends AnyWordSpec with Matchers {
+/**
+ * Test specification for AppConfiguration following clean architecture principles.
+ * 
+ * Tests configuration loading, validation, and path resolution while ensuring
+ * complete isolation from production environment.
+ * 
+ * CRITICAL: This test class now uses BaseTestSpec to prevent production data
+ * contamination. All configuration tests use TestConfiguration.testConfig().
+ */
+class AppConfigurationSpec extends AnyWordSpec with BaseTestSpec with Matchers {
   
   "AppConfiguration" should {
     
-    "load default configuration values" in {
-      val config = AppConfiguration.default()
+    "load test configuration values safely" in {
+      // Use test-isolated configuration - NEVER AppConfiguration.default() in tests!
+      val config = TestConfiguration.testConfig()
       
       config.sparkAppName should be("LastFM-Session-Analyzer")
       config.sparkMaster should be("local[2]")  // Using test config value
       config.sessionGapMinutes should be(20)
       config.topSessions should be(50)
       config.topTracks should be(10)
+      config.isTest should be(true)
+      config.environment should be("test")
     }
     
-    "use configuration overrides" in {
+    "use configuration overrides while maintaining test isolation" in {
       val overrides = Map(
         "spark.app.name" -> "TestApp",
         "pipeline.session.gap.minutes" -> 30,
         "pipeline.ranking.top.sessions" -> 100
       )
       
-      val config = AppConfiguration.withOverrides(overrides)
+      val config = TestConfiguration.testConfigWithOverrides(overrides)
       
       config.sparkAppName should be("TestApp")
       config.sessionGapMinutes should be(30)
       config.topSessions should be(100)
+      // Ensure test isolation is maintained
+      config.isTest should be(true)
+      config.outputBasePath should startWith("data/test")
     }
     
-    "provide path configurations" in {
-      val config = AppConfiguration.default()
+    "provide test-isolated path configurations" in {
+      val config = TestConfiguration.testConfig()
       
+      // Input paths can use production data safely (read-only)
       config.inputBasePath should be("data/input")
-      config.outputBasePath should be("data/output")
-      config.bronzePath should be("data/output/bronze")
-      config.silverPath should be("data/output/silver")
-      config.goldPath should be("data/output/gold")
-      config.resultsPath should be("data/output/results")
+      
+      // Output paths must be test-isolated (write operations)
+      config.outputBasePath should be("data/test")
+      config.bronzePath should be("data/test/bronze")
+      config.silverPath should be("data/test/silver")
+      config.goldPath should be("data/test/gold")
+      config.resultsPath should be("data/test/results")
     }
     
-    "provide performance configurations" in {
-      val config = AppConfiguration.default()
+    "provide performance configurations in test environment" in {
+      val config = TestConfiguration.testConfig()
       
       config.defaultPartitions should be(8)  // Using test config values
       config.rankingPartitions should be(4)  // Using test config values
@@ -53,16 +72,16 @@ class AppConfigurationSpec extends AnyWordSpec with Matchers {
       config.cacheStorageLevel should be("MEMORY_AND_DISK_SER")
     }
     
-    "provide retry configurations" in {
-      val config = AppConfiguration.default()
+    "provide retry configurations in test environment" in {
+      val config = TestConfiguration.testConfig()
       
       config.maxRetryAttempts should be(3)
       config.retryDelayMs should be(1000)
       config.retryBackoffMultiplier should be(2.0)
     }
     
-    "provide monitoring configurations" in {
-      val config = AppConfiguration.default()
+    "provide monitoring configurations in test environment" in {
+      val config = TestConfiguration.testConfig()
       
       config.isMetricsEnabled should be(true)
       config.metricsIntervalSeconds should be(60)
@@ -70,44 +89,46 @@ class AppConfigurationSpec extends AnyWordSpec with Matchers {
       config.performanceErrorThresholdMs should be(30000)
     }
     
-    "provide quality configurations" in {
-      val config = AppConfiguration.default()
+    "provide quality configurations in test environment" in {
+      val config = TestConfiguration.testConfig()
       
       config.qualityThreshold should be(95.0)
       config.maxRejectionRate should be(0.05)
     }
     
-    "detect environment correctly" in {
-      val config = AppConfiguration.default()
+    "detect test environment correctly" in {
+      val config = TestConfiguration.testConfig()
       
       config.environment should be("test")
       config.isProduction should be(false)
       config.isTest should be(true)
     }
     
-    "create PipelineConfig from configuration" in {
-      val config = AppConfiguration.default()
+    "create test-isolated PipelineConfig from configuration" in {
+      val config = TestConfiguration.testConfig()
       val pipelineConfig = config.toPipelineConfig
       
+      // Validate all paths are test-isolated
       pipelineConfig.outputPath should be(config.resultsPath)
-      pipelineConfig.bronzePath should be(config.bronzePath)
-      pipelineConfig.silverPath should be(config.silverPath)
-      pipelineConfig.goldPath should be(config.goldPath)
+      pipelineConfig.outputPath should startWith("data/test")
+      pipelineConfig.bronzePath should startWith("data/test")
+      pipelineConfig.silverPath should startWith("data/test")
+      pipelineConfig.goldPath should startWith("data/test")
       pipelineConfig.sparkConfig.partitions should be(8)  // Test config value
       pipelineConfig.sparkConfig.adaptiveEnabled should be(true)
       pipelineConfig.qualityThresholds.sessionAnalysisMinQuality should be(config.qualityThreshold)
       pipelineConfig.qualityThresholds.maxSuspiciousUserRatio should be(config.maxRejectionRate * 100)
     }
     
-    "validate configuration successfully with valid values" in {
-      val config = AppConfiguration.default()
+    "validate test configuration successfully with valid values" in {
+      val config = TestConfiguration.testConfig()
       
       config.validate() should be(Success(()))
     }
     
-    "fail validation with invalid session gap" in {
+    "fail validation with invalid session gap in test environment" in {
       val overrides = Map("pipeline.session.gap.minutes" -> 0)
-      val config = AppConfiguration.withOverrides(overrides)
+      val config = TestConfiguration.testConfigWithOverrides(overrides)
       
       config.validate() match {
         case Failure(e) => e.getMessage should include("Session gap must be positive")
@@ -115,9 +136,9 @@ class AppConfigurationSpec extends AnyWordSpec with Matchers {
       }
     }
     
-    "fail validation with invalid quality threshold" in {
+    "fail validation with invalid quality threshold in test environment" in {
       val overrides = Map("pipeline.quality.acceptable.threshold" -> 101.0)
-      val config = AppConfiguration.withOverrides(overrides)
+      val config = TestConfiguration.testConfigWithOverrides(overrides)
       
       config.validate() match {
         case Failure(e) => e.getMessage should include("Quality threshold must be between 0 and 100")
@@ -125,12 +146,12 @@ class AppConfigurationSpec extends AnyWordSpec with Matchers {
       }
     }
     
-    "fail validation with invalid performance thresholds" in {
+    "fail validation with invalid performance thresholds in test environment" in {
       val overrides = Map(
         "monitoring.performance.warning.threshold.ms" -> 10000,
         "monitoring.performance.error.threshold.ms" -> 5000
       )
-      val config = AppConfiguration.withOverrides(overrides)
+      val config = TestConfiguration.testConfigWithOverrides(overrides)
       
       config.validate() match {
         case Failure(e) => e.getMessage should include("Performance error threshold must be greater than warning threshold")

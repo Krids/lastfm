@@ -92,10 +92,10 @@ class RankingResultSpec extends AnyFlatSpec with Matchers {
       totalSessionsAnalyzed = 1000,
       totalTracksAnalyzed = 50000,
       processingTimeMillis = 2500,
-      qualityScore = 98.5
+      qualityScore = 99.5  // Above session analysis threshold
     )
 
-    result.qualityScore shouldBe 98.5
+    result.qualityScore shouldBe 99.5
     result.isHighQuality shouldBe true
   }
 

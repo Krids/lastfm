@@ -1,6 +1,9 @@
 package com.lastfm.sessions.pipelines
 
 import com.lastfm.sessions.domain.DataQualityMetrics
+import com.lastfm.sessions.common.{Constants, ConfigurableConstants, ErrorMessages}
+import com.lastfm.sessions.common.traits.{MetricsCalculator, DataValidator}
+import com.lastfm.sessions.common.monitoring.PerformanceMonitor
 import org.apache.spark.sql.{SparkSession, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -37,7 +40,10 @@ import scala.util.control.NonFatal
  * @author Felipe Lana Machado
  * @since 1.0.0
  */
-class DataCleaningPipeline(val config: PipelineConfig)(implicit spark: SparkSession) {
+class DataCleaningPipeline(val config: PipelineConfig)(implicit spark: SparkSession) 
+  extends MetricsCalculator 
+  with DataValidator 
+  with PerformanceMonitor {
   
   import spark.implicits._
   
@@ -110,13 +116,17 @@ class DataCleaningPipeline(val config: PipelineConfig)(implicit spark: SparkSess
    */
   def calculateOptimalPartitions(estimatedUserCount: Int): Int = {
     val cores = Runtime.getRuntime.availableProcessors()
-    val targetUsersPerPartition = 62 // Optimal for session analysis based on memory analysis
+    // Use the trait method that takes two parameters
+    val targetUsersPerPartition = ConfigurableConstants.Partitioning.USERS_PER_PARTITION_TARGET.value
+    val minPartitions = ConfigurableConstants.Partitioning.MIN_PARTITIONS.value
+    val maxPartitions = ConfigurableConstants.Partitioning.MAX_PARTITIONS.value
+    val partitionMultiplier = Constants.Partitioning.PARTITION_MULTIPLIER
     
-    val basePartitions = Math.max(estimatedUserCount / targetUsersPerPartition, 1)
-    val coreBasedPartitions = cores * 2 // 2x cores for I/O optimization
+    val dataBasedPartitions = Math.max(estimatedUserCount / targetUsersPerPartition, 1)
+    val coreBasedPartitions = cores * partitionMultiplier
+    val optimalPartitions = Math.max(dataBasedPartitions, coreBasedPartitions)
     
-    // Use the larger of the two, but cap at reasonable maximum
-    Math.max(16, Math.min(basePartitions, Math.max(coreBasedPartitions, 200)))
+    Math.max(minPartitions, Math.min(optimalPartitions, maxPartitions))
   }
   
   /**

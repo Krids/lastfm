@@ -10,6 +10,9 @@ import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
  * Provides isolated test directories to prevent interference with production data.
  * All test artifacts are written to data/test/ and cleaned up after tests.
  * 
+ * ⚠️  IMPORTANT: This trait is now integrated with BaseTestSpec for enhanced safety.
+ * For new tests, extend BaseTestSpec instead of using TestEnvironment directly.
+ * 
  * Directory Structure:
  * - data/test/bronze/   - Test input files
  * - data/test/silver/   - Test intermediate data (cleaned events, sessions)
@@ -195,6 +198,9 @@ trait TestEnvironment extends BeforeAndAfterAll with BeforeAndAfterEach { this: 
   
   /**
    * Creates a test configuration that uses test directories.
+   * 
+   * ⚠️  DEPRECATED: Use TestConfiguration.testConfig() instead for new tests.
+   * This method is maintained for backward compatibility with existing tests.
    */
   protected def createTestPipelineConfig(
     bronzePath: String = s"$testBronzeDir/test-input.tsv",
@@ -202,13 +208,29 @@ trait TestEnvironment extends BeforeAndAfterAll with BeforeAndAfterEach { this: 
   ): com.lastfm.sessions.pipelines.PipelineConfig = {
     import com.lastfm.sessions.pipelines._
     
+    // Validate paths are test-isolated
+    require(bronzePath.startsWith("data/test"), 
+      s"CRITICAL: Test bronze path must use data/test/, got: $bronzePath")
+    require(silverPath.startsWith("data/test"), 
+      s"CRITICAL: Test silver path must use data/test/, got: $silverPath")
+    
     PipelineConfig(
       bronzePath = bronzePath,
       silverPath = silverPath,
+      goldPath = testGoldDir,
+      outputPath = testResultsDir,
       partitionStrategy = UserIdPartitionStrategy(userCount = 100, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 95.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")
     )
+  }
+  
+  /**
+   * Gets test-isolated configuration using the new safety framework.
+   * This method bridges legacy TestEnvironment with new TestConfiguration.
+   */
+  protected def getTestConfig(): com.lastfm.sessions.config.AppConfiguration = {
+    TestConfiguration.testConfig()
   }
   
   /**

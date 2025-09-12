@@ -1,6 +1,9 @@
-FROM openjdk:11-jre-slim
+# =============================================================================
+# Builder Stage: Download dependencies and compile application
+# =============================================================================
+FROM openjdk:11-jdk-slim AS builder
 
-# Install essential tools and SBT
+# Install essential build tools
 RUN apt-get update && \
     apt-get install -y curl && \
     # Install SBT 1.9.7 (compatible with our build)
@@ -11,12 +14,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Create app directory
 WORKDIR /app
-
-# Set memory-optimized JVM settings for static data processing
-ENV JAVA_OPTS="-Xmx8g -XX:+UseG1GC -XX:+UseContainerSupport -XX:G1HeapRegionSize=16m"
-ENV SBT_OPTS="$JAVA_OPTS"
 
 # Copy build configuration first (for Docker layer caching)
 COPY project/ project/
@@ -25,18 +23,44 @@ COPY build.sbt build.sbt
 # Pre-download dependencies (this layer will be cached)
 RUN sbt update
 
-# Copy source code
+# Copy source code and compile
 COPY src/ src/
+RUN sbt compile test:compile
 
-# Pre-compile the application
-RUN sbt compile
+# =============================================================================
+# Runtime Stage: Minimal JRE with compiled application
+# =============================================================================
+FROM openjdk:11-jre-slim AS runtime
 
-# Create data directories
-RUN mkdir -p data/input data/output/{bronze,silver,gold,results} logs
+# Create non-root user for security
+RUN groupadd -r lastfm && useradd -r -g lastfm -d /app -s /bin/bash lastfm
 
-# Copy and use proper entrypoint script with correct SBT syntax
+# Create app directory and set ownership
+WORKDIR /app
+RUN chown -R lastfm:lastfm /app
+
+# Set default JVM settings (can be overridden at runtime)
+ENV JAVA_OPTS="-Xmx8g -XX:+UseG1GC -XX:+UseContainerSupport -XX:G1HeapRegionSize=16m"
+
+# Copy compiled application from builder stage
+COPY --from=builder /app/target /app/target
+COPY --from=builder /app/project /app/project
+COPY --from=builder /app/build.sbt /app/build.sbt
+
+# Create data directories with proper permissions
+RUN mkdir -p data/input data/output/{bronze,silver,gold,results} logs && \
+    chown -R lastfm:lastfm data/ logs/
+
+# Copy and configure entrypoint script
 COPY scripts/docker-entrypoint.sh /app/run.sh
-RUN chmod +x /app/run.sh
+RUN chmod +x /app/run.sh && chown lastfm:lastfm /app/run.sh
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD ps aux | grep -q "[j]ava.*Main" || exit 1
+
+# Switch to non-root user
+USER lastfm
 
 ENTRYPOINT ["/app/run.sh"]
 CMD ["complete"]

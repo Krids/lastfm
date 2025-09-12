@@ -1,6 +1,8 @@
 package com.lastfm.sessions.orchestration
 
 import org.apache.spark.sql.SparkSession
+import com.lastfm.sessions.common.{Constants, ConfigurableConstants}
+import com.lastfm.sessions.common.traits.{SparkConfigurable, MetricsCalculator}
 import scala.util.Try
 
 /**
@@ -16,7 +18,7 @@ import scala.util.Try
  * @author Felipe Lana Machado
  * @since 1.0.0
  */
-object SparkSessionManager {
+object SparkSessionManager extends SparkConfigurable with MetricsCalculator {
 
   /**
    * Creates production-optimized Spark session for Last.fm pipeline processing.
@@ -31,27 +33,19 @@ object SparkSessionManager {
    */
   def createProductionSession(): SparkSession = {
     val cores = Runtime.getRuntime.availableProcessors()
-    val optimalPartitions = 16 // Optimal for 1K users session analysis (~62 users per partition)
+    val optimalPartitions = ConfigurableConstants.Partitioning.DEFAULT_PARTITIONS.value
     val heapSizeGB = (Runtime.getRuntime.maxMemory() / 1024 / 1024 / 1024).toInt
     
-    SparkSession.builder()
+    val builder = SparkSession.builder()
       .appName("LastFM-SessionAnalysis-Production-Pipeline")
-      .master(s"local[$cores]") // Use all available cores
-      .config("spark.sql.shuffle.partitions", optimalPartitions.toString)
-      .config("spark.sql.session.timeZone", "UTC") // Consistent timezone handling
-      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") // Performance
-      .config("spark.sql.adaptive.enabled", "true") // Adaptive query execution
-      .config("spark.sql.adaptive.coalescePartitions.enabled", "true") // Smart coalescing
-      .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "128MB") // Larger partitions for 19M records
-      .config("spark.driver.maxResultSize", "8g") // Accommodate large results for 19M records
-      .config("spark.driver.memory", s"${Math.min(heapSizeGB - 2, 16)}g") // More memory for large dataset
-      .config("spark.executor.memory", "4g") // Increased executor memory
-      .config("spark.local.dir", System.getProperty("java.io.tmpdir")) // Temp storage
-      .config("spark.sql.adaptive.coalescePartitions.initialPartitionNum", "16") // Start with optimal partitions
-      .config("spark.sql.adaptive.skewJoin.enabled", "true") // Handle data skew
-      .config("spark.sql.files.maxPartitionBytes", "134217728") // 128MB per file partition
-      .config("spark.sql.execution.arrow.pyspark.enabled", "false") // Disable for Scala optimization
-      .config("spark.driver.extraJavaOptions", getOptimalJVMOptions()) // Enterprise JVM tuning
+    
+    // Apply production configuration using trait
+    configureForProduction(builder)
+      .config("spark.driver.memory", s"${Math.min(heapSizeGB - 2, 16)}g")
+      .config("spark.executor.memory", "4g")
+      .config("spark.driver.maxResultSize", "8g")
+      .config("spark.local.dir", System.getProperty("java.io.tmpdir"))
+      .config("spark.driver.extraJavaOptions", getOptimalJVMOptions(heapSizeGB))
       .getOrCreate()
   }
 
@@ -64,14 +58,11 @@ object SparkSessionManager {
    * - Simplified configuration for CI/CD compatibility
    */
   def createTestSession(): SparkSession = {
-    SparkSession.builder()
+    val builder = SparkSession.builder()
       .appName("LastFM-SessionAnalysis-Test")
-      .master("local[2]") // Limited cores for testing
-      .config("spark.sql.shuffle.partitions", "4") // Minimal partitions
-      .config("spark.sql.session.timeZone", "UTC")
-      .config("spark.ui.enabled", "false") // Disable UI for tests
-      .config("spark.driver.memory", "1g") // Minimal memory for tests
-      .getOrCreate()
+    
+    // Apply test configuration using trait
+    configureForTesting(builder).getOrCreate()
   }
 
   /**

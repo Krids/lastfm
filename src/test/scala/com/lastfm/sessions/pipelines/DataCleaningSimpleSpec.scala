@@ -27,8 +27,8 @@ class DataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
   "DataCleaningPipeline" should "calculate optimal partition count for session analysis" in {
     // Given: Pipeline with test configuration
     val testConfig = PipelineConfig(
-      bronzePath = "test/path",
-      silverPath = "test/silver",
+      bronzePath = "data/test/bronze/test-input.tsv",
+      silverPath = "data/test/silver/test-output",
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(99.0, 99.9, 85.0, 5.0),
       sparkConfig = SparkConfig(16, "UTC", true)
@@ -46,8 +46,8 @@ class DataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
   it should "validate partition balance metrics" in {
     // Given: Pipeline
     val testConfig = PipelineConfig(
-      bronzePath = "test/path",
-      silverPath = "test/silver",
+      bronzePath = "data/test/bronze/test-input.tsv",
+      silverPath = "data/test/silver/test-output",
       partitionStrategy = UserIdPartitionStrategy(userCount = 100, cores = 2),
       qualityThresholds = QualityThresholds(95.0, 99.0, 80.0, 10.0),
       sparkConfig = SparkConfig(4, "UTC", true)
@@ -65,8 +65,8 @@ class DataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
   it should "provide partitioning strategy information" in {
     // Given: Pipeline
     val testConfig = PipelineConfig(
-      bronzePath = "test/path",
-      silverPath = "test/silver", 
+      bronzePath = "data/test/bronze/test-input.tsv",
+      silverPath = "data/test/silver/test-output", 
       partitionStrategy = UserIdPartitionStrategy(userCount = 500, cores = 8),
       qualityThresholds = QualityThresholds(99.0, 99.9, 85.0, 5.0),
       sparkConfig = SparkConfig(16, "UTC", true)
@@ -86,8 +86,8 @@ class DataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
   it should "analyze memory usage metrics" in {
     // Given: Pipeline
     val testConfig = PipelineConfig(
-      bronzePath = "test/path",
-      silverPath = "test/silver",
+      bronzePath = "data/test/bronze/test-input.tsv",
+      silverPath = "data/test/silver/test-output",
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(99.0, 99.9, 85.0, 5.0),
       sparkConfig = SparkConfig(16, "UTC", true)
@@ -107,8 +107,8 @@ class DataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
   it should "handle partition skew analysis" in {
     // Given: Pipeline
     val testConfig = PipelineConfig(
-      bronzePath = "test/path",
-      silverPath = "test/silver",
+      bronzePath = "data/test/bronze/test-input.tsv",
+      silverPath = "data/test/silver/test-output",
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(99.0, 99.9, 85.0, 5.0),
       sparkConfig = SparkConfig(16, "UTC", true)
