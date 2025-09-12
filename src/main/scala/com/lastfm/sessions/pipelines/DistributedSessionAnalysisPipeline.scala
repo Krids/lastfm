@@ -1,10 +1,12 @@
 package com.lastfm.sessions.pipelines
 
-import com.lastfm.sessions.application.{SessionAnalysisService, DistributedSessionAnalysisFactory}
-import com.lastfm.sessions.domain.DistributedSessionAnalysis
+import com.lastfm.sessions.domain.{DistributedSessionAnalysis, SessionMetrics}
+import com.lastfm.sessions.infrastructure.SparkDistributedSessionAnalysisRepository
 import org.apache.spark.sql.SparkSession
 import scala.util.{Try, Success, Failure}
 import scala.util.control.NonFatal
+import java.nio.file.{Files, Paths}
+import java.nio.charset.StandardCharsets
 
 /**
  * Production-grade Distributed Session Analysis Pipeline for Silver → Gold transformation.
@@ -53,25 +55,41 @@ class DistributedSessionAnalysisPipeline(val config: PipelineConfig)(implicit sp
    */
   def execute(): Try[DistributedSessionAnalysis] = {
     try {
-      println(s"🔄 Starting Distributed Session Analysis Pipeline: Silver → Gold")
-      println(s"   Silver Path: ${config.silverPath}")
-      println(s"   Gold Path: ${deriveGoldPath}")
+      println(s"🔄 Starting Distributed Session Analysis Pipeline: Silver → Silver + Gold")
+      println(s"   Clean Events Path: ${config.silverPath}")
+      println(s"   Sessions Output: ${deriveSilverSessionsPath}")
+      println(s"   Gold Analytics Path: ${deriveGoldPath}")
       println(s"   Session Gap: 20 minutes (distributed window functions)")
-      println(s"   Processing Mode: Distributed (no driver memory collection)")
       
-      // Step 1: Create distributed session analysis service with optimal configuration
-      println("⚙️  Step 1: Creating distributed session analysis service...")
-      val service = DistributedSessionAnalysisFactory.createProductionService
-      println("✅ Service created with optimal Spark configuration")
+      // Step 1: Create sessions from clean events and save to Silver layer
+      println("📊 Step 1: Creating sessions from Silver events...")
+      val repository = new SparkDistributedSessionAnalysisRepository()
+      val sessionsResult = repository.createAndPersistSessions(config.silverPath, deriveSilverSessionsPath)
       
-      // Step 2: Execute distributed session analysis workflow
-      println("📊 Step 2: Executing distributed session analysis workflow...")
-      val analysisResult = service.analyzeUserSessions(config.silverPath, deriveGoldPath)
-      
-      analysisResult match {
-        case Success(analysis) =>
-          logSuccessMetrics(analysis)
-          Success(analysis)
+      sessionsResult match {
+        case Success(sessionMetrics) =>
+          println("✅ Sessions created and persisted to Silver layer")
+          
+          // Step 2: Create analytics and persist to Gold layer
+          println("🏆 Step 2: Creating analytics for Gold layer...")
+          val analysis = createComprehensiveAnalysis(sessionMetrics)
+          
+          // Step 3: Create Gold layer structure
+          repository.persistAnalysis(analysis, deriveGoldPath) match {
+            case Success(_) =>
+              println("✅ Gold layer structure prepared")
+              
+              // Step 4: Generate JSON report with all metrics and analytics
+              generateSessionAnalysisJSON(analysis, deriveGoldPath)
+              println("📄 JSON report generated with comprehensive metrics and analytics")
+              
+              logSuccessMetrics(analysis)
+              Success(analysis)
+              
+            case Failure(exception) =>
+              logFailure(exception)
+              Failure(exception)
+          }
           
         case Failure(exception) =>
           logFailure(exception)
@@ -91,7 +109,85 @@ class DistributedSessionAnalysisPipeline(val config: PipelineConfig)(implicit sp
    * Follows medallion architecture naming conventions.
    */
   private def deriveGoldPath: String = {
-    config.silverPath.replace("silver", "gold").replace(".tsv", "-distributed-sessions")
+    // Replace silver with gold and add session-analytics suffix
+    val basePath = config.silverPath.replace("silver", "gold")
+    if (basePath.endsWith(".parquet")) {
+      basePath.replace(".parquet", "-session-analytics")
+    } else {
+      s"${basePath}-session-analytics"
+    }
+  }
+  
+  /**
+   * Derives Silver layer sessions output path.
+   * Sessions are stored in Silver layer for downstream processing.
+   */
+  private def deriveSilverSessionsPath: String = {
+    "data/output/silver/sessions.parquet"
+  }
+  
+  /**
+   * Creates comprehensive distributed session analysis from metrics.
+   * The analysis uses business rules defined in the domain model.
+   */
+  private def createComprehensiveAnalysis(metrics: SessionMetrics): DistributedSessionAnalysis = {
+    // Create analysis - domain model handles quality assessment and performance categorization
+    DistributedSessionAnalysis(metrics)
+  }
+  
+  /**
+   * Generates JSON report for session analysis pipeline.
+   * Follows the same pattern as data-cleaning quality reports.
+   */
+  private def generateSessionAnalysisJSON(analysis: DistributedSessionAnalysis, goldPath: String): Unit = {
+    val reportPath = s"$goldPath/session-analysis-report.json"
+    val reportContent = generateSessionAnalysisReportJSON(analysis)
+    
+    // Ensure Gold directory exists
+    val outputFile = Paths.get(reportPath)
+    val outputDir = outputFile.getParent
+    if (outputDir != null) {
+      Files.createDirectories(outputDir)
+    }
+    
+    Files.write(outputFile, reportContent.getBytes(StandardCharsets.UTF_8))
+    println(s"📄 Session analysis JSON report generated: $reportPath")
+  }
+  
+  /**
+   * Creates JSON content for session analysis report.
+   */
+  private def generateSessionAnalysisReportJSON(analysis: DistributedSessionAnalysis): String = {
+    s"""{
+  "timestamp": "${java.time.Instant.now()}",
+  "pipeline": "session-analysis",
+  "processing": {
+    "totalSessions": ${analysis.metrics.totalSessions},
+    "uniqueUsers": ${analysis.metrics.uniqueUsers},
+    "totalTracks": ${analysis.metrics.totalTracks},
+    "averageSessionLength": ${analysis.metrics.averageSessionLength},
+    "qualityScore": ${analysis.metrics.qualityScore}
+  },
+  "qualityAssessment": "${analysis.qualityAssessment}",
+  "performanceCategory": "${analysis.performanceCategory}",
+  "ecosystem": {
+    "isSuccessfulEcosystem": ${analysis.isSuccessfulEcosystem},
+    "userActivityScore": ${analysis.userActivityScore}
+  },
+  "architecture": {
+    "silverLayerSessions": "data/output/silver/sessions.parquet",
+    "goldLayerAnalytics": "${deriveGoldPath}",
+    "partitioningStrategy": "16 partitions, ~62 users per partition",
+    "sessionGapAlgorithm": "20-minute window functions"
+  },
+  "thresholds": {
+    "excellentQuality": 95.0,
+    "goodQuality": 85.0,
+    "acceptableQuality": 70.0,
+    "highVolumeThreshold": 10000,
+    "mediumVolumeThreshold": 1000
+  }
+}"""
   }
   
   /**
@@ -113,7 +209,7 @@ class DistributedSessionAnalysisPipeline(val config: PipelineConfig)(implicit sp
       println("🎉 Analysis indicates a successful listening ecosystem!")
     }
     
-    println(s"💾 Gold layer artifacts generated at: ${deriveGoldPath}")
+    println(s"💾 JSON report with all metrics saved at: ${deriveGoldPath}/session-analysis-report.json")
     println("🚀 Ready for downstream processing and ranking analysis")
   }
   

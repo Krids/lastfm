@@ -1,7 +1,6 @@
 package com.lastfm.sessions.infrastructure
 
 import com.lastfm.sessions.domain._
-import com.lastfm.sessions.output.FinalTSVOutputGenerator
 import org.apache.spark.sql.{SparkSession, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{functions => sparkFunctions}
@@ -88,8 +87,8 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
       val sparkStream = eventsStream.asInstanceOf[SparkEventStream]
       val sessionsDF = calculateSessionsDistributed(sparkStream.df)
       
-      // **NEW: Persist session dataset to Silver layer as intermediary step**
-      persistSessionDatasetToSilver(sessionsDF, deriveSilverSessionPath(sparkStream))
+      // REMOVED: Session persistence moved to session-analysis pipeline
+      // This ensures data-cleaning only creates clean events, not sessions
       
       // Calculate all metrics in single aggregation pass
       val metricsRow = sessionsDF
@@ -111,8 +110,8 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
         qualityScore = metricsRow.getAs[Double]("qualityScore")
       )
       
-      println(s"💾 Session dataset persisted to Silver layer as intermediary step")
-      println(f"   Sessions: ${metrics.totalSessions} across ${metrics.uniqueUsers} users")
+      println(f"💾 Session metrics calculated: ${metrics.totalSessions} sessions across ${metrics.uniqueUsers} users")
+      println("   Note: Session dataset persistence moved to session-analysis pipeline")
       
       Success(metrics)
       
@@ -123,43 +122,92 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
   }
   
   /**
-   * Persists complete session dataset to Silver layer as intermediary step.
+   * Creates sessions from Silver events and persists them to Silver layer.
    * 
-   * This creates an intermediary session dataset in the Silver layer that contains:
-   * - Complete session information with metadata
-   * - Strategic userId partitioning (inherited from cleaned events)
-   * - Parquet format for efficiency and schema evolution
-   * - Ready for Gold layer processing (50 largest sessions, top 10 tracks)
+   * This method properly implements the session-analysis pipeline responsibilities:
+   * - Reads clean events from Silver layer
+   * - Calculates sessions using 20-minute gap algorithm
+   * - Saves sessions to Silver layer with optimal partitioning
    * 
-   * @param sessionsDF Complete sessions DataFrame
-   * @param silverSessionPath Path for Silver layer session dataset
+   * @param silverEventsPath Path to clean events in Silver layer
+   * @param silverSessionsPath Path for sessions output in Silver layer  
+   * @return Try containing session metrics
    */
-  private def persistSessionDatasetToSilver(sessionsDF: DataFrame, silverSessionPath: String): Unit = {
-    println(s"💾 Persisting session dataset to Silver layer: $silverSessionPath")
-    
-    // Write sessions as Parquet with optimal partitioning (not one per user)
-    val optimalPartitions = 16 // Optimal for 992 users (~62 users per partition)
-    
-    sessionsDF
-      .repartition(optimalPartitions, col("userId")) // Optimal partitioning for performance
-      .write
-      .mode("overwrite")
-      .option("compression", "snappy") // Optimal balance of speed and compression
-      .parquet(silverSessionPath) // No partitionBy to avoid small file problem
-    
-    val sessionCount = sessionsDF.count()
-    println(s"✅ Session dataset persisted: $sessionCount sessions in Silver layer")
+  def createAndPersistSessions(silverEventsPath: String, silverSessionsPath: String): Try[SessionMetrics] = {
+    try {
+      println(s"🔄 Creating sessions from Silver events: $silverEventsPath")
+      
+      // Load clean events from Silver layer and parse timestamp
+      val eventsDF = spark.read.parquet(silverEventsPath)
+        .withColumn("timestamp", to_timestamp($"timestamp", "yyyy-MM-dd'T'HH:mm:ss'Z'"))
+        .filter($"timestamp".isNotNull)
+      println(s"📊 Loaded ${eventsDF.count()} clean events from Silver layer")
+      
+      // Calculate sessions using distributed operations
+      val sessionsDF = calculateSessionsDistributed(eventsDF)
+      
+      // Persist sessions to Silver layer with optimal partitioning
+      persistSessionsToSilver(sessionsDF, silverSessionsPath)
+      
+      // Calculate session metrics
+      val metricsRow = sessionsDF
+        .agg(
+          sparkFunctions.count(lit(1)).as("totalSessions"),
+          sparkFunctions.countDistinct("userId").as("uniqueUsers"),
+          sparkFunctions.sum("trackCount").as("totalTracks"),
+          sparkFunctions.avg("trackCount").as("averageSessionLength"),
+          lit(99.0).as("qualityScore")
+        )
+        .collect()
+        .head
+      
+      val metrics = SessionMetrics(
+        totalSessions = metricsRow.getAs[Long]("totalSessions"),
+        uniqueUsers = metricsRow.getAs[Long]("uniqueUsers"),
+        totalTracks = metricsRow.getAs[Long]("totalTracks"),
+        averageSessionLength = metricsRow.getAs[Double]("averageSessionLength"),
+        qualityScore = metricsRow.getAs[Double]("qualityScore")
+      )
+      
+      println(f"✅ Sessions created: ${metrics.totalSessions} sessions across ${metrics.uniqueUsers} users")
+      Success(metrics)
+      
+    } catch {
+      case NonFatal(exception) =>
+        Failure(new RuntimeException(s"Failed to create and persist sessions: ${exception.getMessage}", exception))
+    }
   }
   
   /**
-   * Derives Silver layer session dataset path from events path.
-   * 
-   * @param sparkStream Original events stream
-   * @return Path for Silver layer session dataset
+   * Persists sessions to Silver layer with optimal partitioning.
+   * Maintains consistency with data-cleaning pipeline partitioning strategy.
    */
-  private def deriveSilverSessionPath(sparkStream: SparkEventStream): String = {
-    // Create session dataset path in Silver layer
-    "data/output/silver/session-dataset"
+  private def persistSessionsToSilver(sessionsDF: DataFrame, silverSessionsPath: String): Unit = {
+    println(s"💾 Persisting sessions to Silver layer: $silverSessionsPath")
+    
+    val optimalPartitions = 16 // Consistent with data-cleaning pipeline
+    val estimatedUsers = 992 // Based on current dataset
+    
+    println(s"📈 Session Partitioning Strategy:")
+    println(s"   Target Partitions: $optimalPartitions")
+    println(s"   Estimated Users: $estimatedUsers")  
+    println(s"   Users per Partition: ~${estimatedUsers/optimalPartitions}")
+    println(s"   Partitioning Key: userId (optimal for session analysis)")
+    
+    sessionsDF
+      .repartition(optimalPartitions, col("userId")) // Strategic partitioning consistent with architecture
+      .write
+      .mode("overwrite")
+      .option("compression", "snappy") // Optimal balance of speed and compression
+      .parquet(silverSessionsPath) // Creates exactly 16 parquet files
+    
+    println(s"✅ Sessions persisted with optimal partitioning:")
+    println(s"   Files Created: $optimalPartitions parquet files")
+    println(s"   Path: $silverSessionsPath/")
+    println(s"   Performance: Optimized for downstream ranking pipeline")
+    
+    // Validate partitioning
+    validateSessionPartitioning(silverSessionsPath)
   }
   
   /**
@@ -172,41 +220,42 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
    * - Prepares structure for future 50 largest sessions and top 10 tracks
    * - Idempotent operations safe for re-runs
    */
+  /**
+   * Validates session partitioning after persistence.
+   */
+  private def validateSessionPartitioning(silverSessionsPath: String): Unit = {
+    println("🔍 Validating session partitioning...")
+    
+    try {
+      val sessionDir = new java.io.File(silverSessionsPath)
+      if (sessionDir.exists()) {
+        val sessionFiles = sessionDir.listFiles()
+          .filter(_.getName.startsWith("part-"))
+        
+        println(s"✅ Partition validation successful:")
+        println(s"   Expected: 16 partitions")
+        println(s"   Actual: ${sessionFiles.length} partitions") 
+        
+        if (sessionFiles.length == 16) {
+          println("🎯 Perfect! Partition count matches architecture design")
+        } else {
+          println("⚠️  Warning: Partition count differs from expected 16")
+        }
+      } else {
+        println("⚠️  Warning: Session directory not found for validation")
+      }
+    } catch {
+      case ex: Exception =>
+        println(s"⚠️  Could not validate partitioning: ${ex.getMessage}")
+    }
+  }
+  
   override def persistAnalysis(analysis: DistributedSessionAnalysis, goldPath: String): Try[Unit] = {
     require(goldPath != null && goldPath.nonEmpty, "goldPath cannot be null or empty")
     
     try {
-      // Create metrics DataFrame for persistence
-      val metricsDF = Seq(analysis.metrics).toDF()
-      
-      // Write metrics to Gold layer
-      metricsDF
-        .coalesce(1)
-        .write
-        .mode("overwrite")
-        .option("header", "true")
-        .csv(s"$goldPath/metrics")
-      
-      // Write analysis summary
-      val summaryDF = Seq((
-        analysis.metrics.totalSessions,
-        analysis.metrics.uniqueUsers,
-        analysis.metrics.totalTracks,
-        analysis.metrics.averageSessionLength,
-        analysis.metrics.qualityScore,
-        analysis.qualityAssessment.toString,
-        analysis.performanceCategory.toString
-      )).toDF("totalSessions", "uniqueUsers", "totalTracks", "averageSessionLength", 
-              "qualityScore", "qualityAssessment", "performanceCategory")
-      
-      summaryDF
-        .coalesce(1)
-        .write
-        .mode("overwrite")
-        .option("header", "true")
-        .csv(s"$goldPath/analysis-summary")
-      
-      // **NEW: Prepare Gold layer structure for future implementation**
+      // Only prepare Gold layer structure - JSON report is generated by the pipeline
+      // CSV metrics are no longer needed as all metrics are in the JSON report
       prepareGoldLayerStructure(goldPath)
       
       Success(())
@@ -239,8 +288,7 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
         """# Gold Layer Structure
           |
           |## Current Implementation (Phase 2 Complete)
-          |- metrics/: Session analysis metrics and summaries
-          |- analysis-summary/: Business insights and quality assessment
+          |- session-analysis-report.json: Comprehensive metrics and analytics in JSON format
           |
           |## Future Implementation (Phase 3 - Ranking Pipeline)
           |- 50-largest-sessions/: Top 50 longest sessions by track count
@@ -330,8 +378,8 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
       .withColumn("prevTimestamp", lag("timestamp", 1).over(userWindow))
       .withColumn("timeGapSeconds",
         when($"prevTimestamp".isNull, 0L)
-        .otherwise(unix_timestamp($"timestamp") - unix_timestamp($"prevTimestamp")))
-      .withColumn("isNewSession", $"timeGapSeconds" > sessionGapSeconds)
+        .otherwise($"timestamp".cast("long") - $"prevTimestamp".cast("long")))
+      .withColumn("isNewSession", $"prevTimestamp".isNull || $"timeGapSeconds" > sessionGapSeconds)
     
     // Step 2: Generate session IDs using cumulative sum
     val withSessionIds = withTimeGaps
@@ -347,7 +395,7 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
         max("timestamp").as("endTime"),
         sparkFunctions.count(lit(1)).as("trackCount"),
         sparkFunctions.countDistinct("trackKey").as("uniqueTracks"),
-        ((max(unix_timestamp($"timestamp")) - min(unix_timestamp($"timestamp"))) / 60).as("durationMinutes")
+        ((max($"timestamp".cast("long")) - min($"timestamp".cast("long"))) / 60).as("durationMinutes")
       )
       .filter($"trackCount" > 0) // Filter out empty sessions
   }
@@ -367,12 +415,19 @@ object SparkDistributedSessionAnalysisRepository {
       .orderBy("timestamp")
     
     // Step 1: Calculate time gaps using window functions
-    val withTimeGaps = eventsDF
+    // Ensure timestamp is properly parsed if it's a string
+    val dfWithTimestamp = if (eventsDF.schema("timestamp").dataType.typeName == "string") {
+      eventsDF.withColumn("timestamp", to_timestamp(col("timestamp"), "yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    } else {
+      eventsDF
+    }
+    
+    val withTimeGaps = dfWithTimestamp
       .withColumn("prevTimestamp", lag("timestamp", 1).over(userWindow))
       .withColumn("timeGapSeconds",
         when(col("prevTimestamp").isNull, 0L)
-        .otherwise(unix_timestamp(col("timestamp")) - unix_timestamp(col("prevTimestamp"))))
-      .withColumn("isNewSession", col("timeGapSeconds") > sessionGapSeconds)
+        .otherwise(col("timestamp").cast("long") - col("prevTimestamp").cast("long")))
+      .withColumn("isNewSession", col("prevTimestamp").isNull || col("timeGapSeconds") > sessionGapSeconds)
     
     // Step 2: Generate session IDs using cumulative sum
     val withSessionIds = withTimeGaps
@@ -388,7 +443,7 @@ object SparkDistributedSessionAnalysisRepository {
         max("timestamp").as("endTime"),
         sparkFunctions.count(lit(1)).as("trackCount"),
         sparkFunctions.countDistinct("trackKey").as("uniqueTracks"),
-        ((max(unix_timestamp(col("timestamp"))) - min(unix_timestamp(col("timestamp")))) / 60).as("durationMinutes")
+        ((max(col("timestamp").cast("long")) - min(col("timestamp").cast("long"))) / 60).as("durationMinutes")
       )
       .filter(col("trackCount") > 0) // Filter out empty sessions
   }

@@ -5,6 +5,7 @@ import org.apache.spark.sql.{SparkSession, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import java.nio.file.{Files, Paths}
+import java.nio.charset.StandardCharsets
 import scala.util.{Try, Success, Failure}
 import scala.util.control.NonFatal
 
@@ -78,6 +79,10 @@ class DataCleaningPipeline(val config: PipelineConfig)(implicit spark: SparkSess
       
       // Stage 2: Execute Bronze → Silver transformation
       val qualityMetrics = executeBronzeToSilverTransformation()
+      
+      // Stage 3: Generate JSON report for data cleaning
+      generateDataCleaningJSON(qualityMetrics, config.silverPath)
+      println("📄 Data cleaning JSON report generated")
       
       println(s"✅ Data cleaning completed with strategic partitioning")
       println(f"   Quality Score: ${qualityMetrics.qualityScore}%.6f%%")
@@ -232,6 +237,78 @@ class DataCleaningPipeline(val config: PipelineConfig)(implicit spark: SparkSess
   }
   
   /**
+   * Generates JSON report for data cleaning pipeline.
+   * Follows the same pattern as session analysis pipeline for consistency.
+   */
+  private def generateDataCleaningJSON(metrics: DataQualityMetrics, silverPath: String): Unit = {
+    val reportPath = s"${silverPath.replace(".parquet", "")}/data-cleaning-report.json"
+    val reportContent = generateDataCleaningReportJSON(metrics)
+    
+    // Ensure output directory exists
+    val outputFile = Paths.get(reportPath)
+    val outputDir = outputFile.getParent
+    if (outputDir != null) {
+      Files.createDirectories(outputDir)
+    }
+    
+    Files.write(outputFile, reportContent.getBytes(StandardCharsets.UTF_8))
+  }
+  
+  /**
+   * Creates JSON content for data cleaning report.
+   */
+  private def generateDataCleaningReportJSON(metrics: DataQualityMetrics): String = {
+    val qualityAssessment = metrics.qualityScore match {
+      case score if score >= 99.9 => "Excellent"
+      case score if score >= 99.0 => "Very Good"
+      case score if score >= 95.0 => "Good"
+      case score if score >= 90.0 => "Acceptable"
+      case _ => "Needs Improvement"
+    }
+    
+    val partitionInfo = getPartitioningStrategy()
+    val memoryMetrics = getMemoryUsageMetrics()
+    
+    s"""{
+  "timestamp": "${java.time.Instant.now()}",
+  "pipeline": "data-cleaning",
+  "processing": {
+    "totalRecords": ${metrics.totalRecords},
+    "validRecords": ${metrics.validRecords},
+    "rejectedRecords": ${metrics.rejectedRecords},
+    "qualityScore": ${metrics.qualityScore},
+    "trackIdCoverage": ${metrics.trackIdCoverage},
+    "suspiciousUsers": ${metrics.suspiciousUsers}
+  },
+  "qualityAssessment": "$qualityAssessment",
+  "rejectionReasons": {
+    ${metrics.rejectionReasons.map { case (reason, count) => 
+      s""""$reason": $count"""
+    }.mkString(",\n    ")}
+  },
+  "architecture": {
+    "bronzeLayerInput": "${config.bronzePath}",
+    "silverLayerOutput": "${config.silverPath}",
+    "outputFormat": "Parquet with Snappy compression",
+    "partitioningStrategy": "${partitionInfo.strategy}",
+    "partitionCount": ${partitionInfo.partitionCount},
+    "eliminatesSessionAnalysisShuffle": ${partitionInfo.eliminatesSessionAnalysisShuffle}
+  },
+  "performance": {
+    "maxDriverMemoryMB": ${memoryMetrics.maxDriverMemoryMB},
+    "usedDriverMemoryMB": ${memoryMetrics.usedDriverMemoryMB},
+    "memoryUtilizationPercent": ${memoryMetrics.memoryUtilizationPercent}
+  },
+  "thresholds": {
+    "sessionAnalysisMinQuality": ${config.qualityThresholds.sessionAnalysisMinQuality},
+    "productionMinQuality": ${config.qualityThresholds.productionMinQuality},
+    "minTrackIdCoverage": ${config.qualityThresholds.minTrackIdCoverage},
+    "maxSuspiciousUserRatio": ${config.qualityThresholds.maxSuspiciousUserRatio}
+  }
+}"""
+  }
+  
+  /**
    * Validates pipeline prerequisites before execution.
    */
   private def validatePipelinePrerequisites(): Unit = {
@@ -363,14 +440,15 @@ class DataCleaningPipeline(val config: PipelineConfig)(implicit spark: SparkSess
     
     // Apply strategic partitioning and write as Parquet
     enhancedDF
-      .repartition(optimalPartitions, $"userId") // Strategic userId partitioning
+      .repartition(optimalPartitions, $"userId") // Strategic userId partitioning - creates optimal number of files
       .write
       .mode("overwrite")
       .option("compression", "snappy") // Optimal balance of speed and compression
-      .partitionBy("userId") // Maintain userId partitioning in storage
-      .parquet(config.silverPath)
+      .parquet(config.silverPath) // No partitionBy to avoid small file problem - creates ~16 files instead of individual user files
     
-    println(s"💾 Silver layer written as userId-partitioned Parquet: ${config.silverPath}")
+    println(s"💾 Silver layer written as optimal-partitioned Parquet: ${config.silverPath}")
+    println(s"   File Structure: $optimalPartitions parquet files (not individual user files)")
+    println(s"   Performance: Optimized for session analysis with ~${1000/optimalPartitions} users per partition")
   }
   
   /**

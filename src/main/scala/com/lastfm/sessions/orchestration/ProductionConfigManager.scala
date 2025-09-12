@@ -42,7 +42,7 @@ object ProductionConfigManager {
     PipelineConfig(
       // Medallion architecture paths for production
       bronzePath = "data/input/lastfm-dataset-1k/userid-timestamp-artid-artname-traid-traname.tsv",
-      silverPath = "data/output/silver/lastfm-listening-events-cleaned.tsv_parquet_data_parquet_data",
+      silverPath = "data/output/silver/listening-events-cleaned.parquet",
       
       // Environment-aware partitioning strategy
       partitionStrategy = UserIdPartitionStrategy(

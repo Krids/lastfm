@@ -87,6 +87,7 @@ trait ParquetTestSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach 
   
   override def afterEach(): Unit = {
     cleanupTestDirectories()
+    cleanupSilverSessionsTestArtifacts()
     ParquetTestUtils.cleanupParquetTestData(createdTestDirs: _*)
     super.afterEach()
   }
@@ -271,6 +272,28 @@ trait ParquetTestSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach 
           .sorted(java.util.Comparator.reverseOrder())
           .forEach(Files.deleteIfExists)
       }
+    }
+  }
+  
+  /**
+   * Cleans up hardcoded Silver layer sessions created by tests.
+   * Tests that execute the session-analysis pipeline create sessions.parquet in 
+   * the actual Silver layer directory instead of test directories.
+   */
+  private def cleanupSilverSessionsTestArtifacts(): Unit = {
+    Try {
+      val silverSessionsPath = Paths.get("data/output/silver/sessions.parquet")
+      if (Files.exists(silverSessionsPath)) {
+        println(s"🧹 Cleaning up test Silver sessions: $silverSessionsPath")
+        Files.walk(silverSessionsPath)
+          .sorted(java.util.Comparator.reverseOrder())
+          .forEach(Files.deleteIfExists)
+        println("✅ Silver sessions test artifacts cleaned")
+      }
+    }.recover {
+      case ex: Exception =>
+        println(s"⚠️  Could not clean Silver sessions: ${ex.getMessage}")
+        // Don't fail tests due to cleanup issues
     }
   }
 }

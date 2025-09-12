@@ -34,9 +34,9 @@ RUN sbt compile
 # Create data directories
 RUN mkdir -p data/input data/output/{bronze,silver,gold,results} logs
 
-# Simple entrypoint script
-RUN echo '#!/bin/bash\nset -e\nPIPELINE=${1:-complete}\nMEMORY=${2:-8192}\nif [ "$PIPELINE" = "test" ]; then\n  exec sbt -mem $MEMORY test\nelse\n  exec sbt -mem $MEMORY runMain com.lastfm.sessions.Main $PIPELINE\nfi' > /app/run.sh && \
-    chmod +x /app/run.sh
+# Copy and use proper entrypoint script with correct SBT syntax
+COPY scripts/docker-entrypoint.sh /app/run.sh
+RUN chmod +x /app/run.sh
 
 ENTRYPOINT ["/app/run.sh"]
 CMD ["complete"]

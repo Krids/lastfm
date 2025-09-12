@@ -1,7 +1,7 @@
 package com.lastfm.sessions.orchestration
 
 import com.lastfm.sessions.pipelines.{PipelineConfig, DistributedSessionAnalysisPipeline}
-import com.lastfm.sessions.application.{DataCleaningServiceFactory, DistributedSessionAnalysisFactory}
+import com.lastfm.sessions.application.DataCleaningServiceFactory
 import com.lastfm.sessions.domain.DataQualityMetrics
 import org.apache.spark.sql.SparkSession
 import scala.util.{Try, Success, Failure}
@@ -93,24 +93,27 @@ object PipelineOrchestrator {
    * - Single-pass aggregations for metrics calculation
    */
   private def executeSessionAnalysisPipeline(config: PipelineConfig): PipelineExecutionResult = {
-    println("🔄 Executing Distributed Session Analysis Service (Silver → Gold)")
+    println("🔄 Executing Enhanced Session Analysis Pipeline (Silver → Silver + Gold)")
     
     using(SparkSessionManager.createProductionSession()) { implicit spark =>
-      val service = DistributedSessionAnalysisFactory.createProductionService
-      val result = service.analyzeUserSessions(config.silverPath, "data/output/gold")
+      // Use the new DistributedSessionAnalysisPipeline with JSON reports and Silver session persistence
+      val pipeline = new DistributedSessionAnalysisPipeline(config)
+      val result = pipeline.execute()
       
       result match {
         case Success(analysis) =>
-          println(s"✅ Distributed session analysis completed successfully")
+          println(s"✅ Enhanced session analysis pipeline completed successfully")
           println(f"   Sessions Generated: ${analysis.metrics.totalSessions}")
           println(f"   Users Analyzed: ${analysis.metrics.uniqueUsers}")
           println(f"   Quality Score: ${analysis.metrics.qualityScore}%.2f%%")
           println(f"   Quality Assessment: ${analysis.qualityAssessment}")
           println(f"   Performance Category: ${analysis.performanceCategory}")
+          println("📄 JSON report with all metrics generated in Gold layer")
+          println("💾 Sessions persisted to Silver layer (16 partitions)")
           PipelineExecutionResult.SessionAnalysisCompleted
           
         case Failure(exception) =>
-          throw new RuntimeException("Distributed session analysis service failed", exception)
+          throw new RuntimeException("Enhanced session analysis pipeline failed", exception)
       }
     }
   }
