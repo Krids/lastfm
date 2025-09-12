@@ -1,6 +1,6 @@
 package com.lastfm.sessions.orchestration
 
-import com.lastfm.sessions.pipelines.{PipelineConfig, DistributedSessionAnalysisPipeline}
+import com.lastfm.sessions.pipelines.{PipelineConfig, DistributedSessionAnalysisPipeline, RankingPipeline}
 import com.lastfm.sessions.application.DataCleaningServiceFactory
 import com.lastfm.sessions.domain.DataQualityMetrics
 import org.apache.spark.sql.SparkSession
@@ -120,12 +120,40 @@ object PipelineOrchestrator {
 
   /**
    * Executes Ranking Pipeline (Gold → Results transformation).
-   * Future implementation - currently returns placeholder.
+   * 
+   * Final pipeline stage that:
+   * - Loads sessions from Silver layer
+   * - Ranks sessions by track count
+   * - Selects top 50 longest sessions
+   * - Aggregates track popularity
+   * - Selects top 10 tracks
+   * - Generates top_songs.tsv (MAIN DELIVERABLE)
+   * 
+   * Uses distributed Spark processing with optimizations:
+   * - Broadcast joins for small datasets
+   * - Strategic caching at key points
+   * - Minimal data collection to driver
    */
   private def executeRankingPipeline(config: PipelineConfig): PipelineExecutionResult = {
-    println("🏆 Ranking Pipeline - Not yet implemented")
-    println("   Next: Top 50 longest sessions → Top 10 songs ranking")
-    PipelineExecutionResult.RankingCompleted
+    println("🏆 Executing Ranking Pipeline (Gold → Results)")
+    
+    using(SparkSessionManager.createProductionSession()) { implicit spark =>
+      val pipeline = new RankingPipeline(config)
+      val result = pipeline.execute()
+      
+      result match {
+        case Success(ranking) =>
+          println(s"✅ Ranking pipeline completed successfully")
+          println(f"   Top Sessions: ${ranking.topSessions.size}")
+          println(f"   Top Tracks: ${ranking.topTracks.size}")
+          println(f"   Processing Time: ${ranking.processingTimeSeconds}%.2f seconds")
+          println(f"   Output: ${config.outputPath}/top_songs.tsv")
+          PipelineExecutionResult.RankingCompleted
+          
+        case Failure(exception) =>
+          throw new RuntimeException("Ranking pipeline failed", exception)
+      }
+    }
   }
 
   /**

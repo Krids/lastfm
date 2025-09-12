@@ -46,7 +46,7 @@ import scala.util.Try
  * @author Felipe Lana Machado
  * @since 1.0.0
  */
-trait ParquetTestSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach {
+trait ParquetTestSpec extends AnyFlatSpec with Matchers with TestEnvironment {
   
   /**
    * Test Spark session optimized for Parquet operations.
@@ -64,14 +64,16 @@ trait ParquetTestSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach 
     .config("spark.sql.parquet.compression.codec", "snappy")
     .config("spark.sql.parquet.enableVectorizedReader", "true")
     .config("spark.sql.parquet.filterPushdown", "true")
+    // Use test root directory for Spark warehouse
+    .config("spark.sql.warehouse.dir", s"$testRootDir/spark-warehouse")
     .getOrCreate()
   
   /**
-   * Base test directory for Parquet files.
+   * Use test directories from TestEnvironment.
    */
-  val testBaseDir = "/tmp/parquet-test"
-  val testDataDir = s"$testBaseDir/data"
-  val testOutputDir = s"$testBaseDir/output"
+  val testBaseDir = testRootDir
+  val testDataDir = testSilverDir
+  val testOutputDir = testGoldDir
   
   /**
    * Tracks created test directories for cleanup.
@@ -79,17 +81,14 @@ trait ParquetTestSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach 
   private var createdTestDirs: List[String] = List.empty
   
   override def beforeEach(): Unit = {
-    super.beforeEach()
-    cleanupTestDirectories()
-    createTestDirectories()
+    super.beforeEach() // Calls TestEnvironment's setup
     createdTestDirs = List.empty
   }
   
   override def afterEach(): Unit = {
-    cleanupTestDirectories()
-    cleanupSilverSessionsTestArtifacts()
+    // Clean Parquet-specific test data
     ParquetTestUtils.cleanupParquetTestData(createdTestDirs: _*)
-    super.afterEach()
+    super.afterEach() // Calls TestEnvironment's cleanup
   }
   
   /**
@@ -254,46 +253,6 @@ trait ParquetTestSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach 
     }
   }
   
-  /**
-   * Creates test directories.
-   */
-  private def createTestDirectories(): Unit = {
-    Files.createDirectories(Paths.get(testDataDir))
-    Files.createDirectories(Paths.get(testOutputDir))
-  }
-  
-  /**
-   * Cleans up test directories.
-   */
-  private def cleanupTestDirectories(): Unit = {
-    Try {
-      if (Files.exists(Paths.get(testBaseDir))) {
-        Files.walk(Paths.get(testBaseDir))
-          .sorted(java.util.Comparator.reverseOrder())
-          .forEach(Files.deleteIfExists)
-      }
-    }
-  }
-  
-  /**
-   * Cleans up hardcoded Silver layer sessions created by tests.
-   * Tests that execute the session-analysis pipeline create sessions.parquet in 
-   * the actual Silver layer directory instead of test directories.
-   */
-  private def cleanupSilverSessionsTestArtifacts(): Unit = {
-    Try {
-      val silverSessionsPath = Paths.get("data/output/silver/sessions.parquet")
-      if (Files.exists(silverSessionsPath)) {
-        println(s"🧹 Cleaning up test Silver sessions: $silverSessionsPath")
-        Files.walk(silverSessionsPath)
-          .sorted(java.util.Comparator.reverseOrder())
-          .forEach(Files.deleteIfExists)
-        println("✅ Silver sessions test artifacts cleaned")
-      }
-    }.recover {
-      case ex: Exception =>
-        println(s"⚠️  Could not clean Silver sessions: ${ex.getMessage}")
-        // Don't fail tests due to cleanup issues
-    }
-  }
+  // Cleanup methods removed - now handled by TestEnvironment trait
+  // TestEnvironment provides createTestDirectories() and cleanup of all test artifacts
 }

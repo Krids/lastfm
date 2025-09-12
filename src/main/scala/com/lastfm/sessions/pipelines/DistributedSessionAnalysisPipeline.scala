@@ -121,9 +121,32 @@ class DistributedSessionAnalysisPipeline(val config: PipelineConfig)(implicit sp
   /**
    * Derives Silver layer sessions output path.
    * Sessions are stored in Silver layer for downstream processing.
+   * 
+   * The path is derived from the config's silverPath to ensure consistency
+   * across different environments (production vs test).
    */
   private def deriveSilverSessionsPath: String = {
-    "data/output/silver/sessions.parquet"
+    // If silverPath points to a specific parquet file/directory, use its parent
+    val baseSilverPath = if (config.silverPath.endsWith(".parquet")) {
+      // Remove the filename to get the directory path
+      val lastSlash = config.silverPath.lastIndexOf("/")
+      if (lastSlash > 0) {
+        config.silverPath.substring(0, lastSlash)
+      } else {
+        "data/output/silver"
+      }
+    } else if (config.silverPath.contains("listening-events-cleaned") || 
+               config.silverPath.contains("orchestration-output")) {
+      // Extract the silver directory path
+      val silverDir = config.silverPath.substring(0, 
+        Math.max(config.silverPath.lastIndexOf("/"), 0))
+      if (silverDir.isEmpty) "data/output/silver" else silverDir
+    } else {
+      // It's already a silver directory path
+      config.silverPath
+    }
+    
+    s"$baseSilverPath/sessions.parquet"
   }
   
   /**

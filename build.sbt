@@ -80,8 +80,6 @@ lazy val root = (project in file("."))
       "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn"
     ),
     Test / javaOptions ++= Seq(
-      "-Dspark.master=local[2]",
-      "-Dspark.app.name=LastFMSessionAnalyzer-Tests",
       "-Dspark.sql.shuffle.partitions=2",
       "-Xmx2g",
       
