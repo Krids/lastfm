@@ -6,26 +6,26 @@ import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession
 
 /**
- * Simplified TDD specification for Enhanced Data Cleaning Pipeline.
+ * Simplified TDD specification for Data Cleaning Pipeline.
  * 
  * Focuses on core functionality testing without complex dependencies.
  * 
  * @author Felipe Lana Machado
  * @since 1.0.0
  */
-class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
+class DataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
 
   // Create test Spark session
   implicit val spark: SparkSession = SparkSession.builder()
-    .appName("EnhancedDataCleaningPipeline-SimpleTest")
+    .appName("DataCleaningPipeline-SimpleTest")
     .master("local[2]")
     .config("spark.sql.shuffle.partitions", "4")
     .config("spark.sql.session.timeZone", "UTC")
     .config("spark.ui.enabled", "false")
     .getOrCreate()
 
-  "EnhancedDataCleaningPipeline" should "calculate optimal partition count for session analysis" in {
-    // Given: Enhanced pipeline with test configuration
+  "DataCleaningPipeline" should "calculate optimal partition count for session analysis" in {
+    // Given: Pipeline with test configuration
     val testConfig = PipelineConfig(
       bronzePath = "test/path",
       silverPath = "test/silver",
@@ -33,7 +33,7 @@ class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
       qualityThresholds = QualityThresholds(99.0, 99.9, 85.0, 5.0),
       sparkConfig = SparkConfig(16, "UTC", true)
     )
-    val pipeline = new EnhancedDataCleaningPipeline(testConfig)
+    val pipeline = new DataCleaningPipeline(testConfig)
     
     // When: Optimal partitions are calculated
     val optimalPartitions = pipeline.calculateOptimalPartitions(1000)
@@ -44,7 +44,7 @@ class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
   }
   
   it should "validate partition balance metrics" in {
-    // Given: Enhanced pipeline
+    // Given: Pipeline
     val testConfig = PipelineConfig(
       bronzePath = "test/path",
       silverPath = "test/silver",
@@ -52,7 +52,7 @@ class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
       qualityThresholds = QualityThresholds(95.0, 99.0, 80.0, 10.0),
       sparkConfig = SparkConfig(4, "UTC", true)
     )
-    val pipeline = new EnhancedDataCleaningPipeline(testConfig)
+    val pipeline = new DataCleaningPipeline(testConfig)
     
     // When: Partition balance is validated (with non-existent path)
     val balanceMetrics = pipeline.validatePartitionBalance("non-existent-path")
@@ -63,7 +63,7 @@ class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
   }
   
   it should "provide partitioning strategy information" in {
-    // Given: Enhanced pipeline
+    // Given: Pipeline
     val testConfig = PipelineConfig(
       bronzePath = "test/path",
       silverPath = "test/silver", 
@@ -71,7 +71,7 @@ class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
       qualityThresholds = QualityThresholds(99.0, 99.9, 85.0, 5.0),
       sparkConfig = SparkConfig(16, "UTC", true)
     )
-    val pipeline = new EnhancedDataCleaningPipeline(testConfig)
+    val pipeline = new DataCleaningPipeline(testConfig)
     
     // When: Partitioning strategy is requested
     val strategyInfo = pipeline.getPartitioningStrategy()
@@ -84,7 +84,7 @@ class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
   }
   
   it should "analyze memory usage metrics" in {
-    // Given: Enhanced pipeline
+    // Given: Pipeline
     val testConfig = PipelineConfig(
       bronzePath = "test/path",
       silverPath = "test/silver",
@@ -92,7 +92,7 @@ class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
       qualityThresholds = QualityThresholds(99.0, 99.9, 85.0, 5.0),
       sparkConfig = SparkConfig(16, "UTC", true)
     )
-    val pipeline = new EnhancedDataCleaningPipeline(testConfig)
+    val pipeline = new DataCleaningPipeline(testConfig)
     
     // When: Memory usage is analyzed
     val memoryMetrics = pipeline.getMemoryUsageMetrics()
@@ -105,7 +105,7 @@ class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
   }
   
   it should "handle partition skew analysis" in {
-    // Given: Enhanced pipeline
+    // Given: Pipeline
     val testConfig = PipelineConfig(
       bronzePath = "test/path",
       silverPath = "test/silver",
@@ -113,7 +113,7 @@ class EnhancedDataCleaningSimpleSpec extends AnyFlatSpec with Matchers {
       qualityThresholds = QualityThresholds(99.0, 99.9, 85.0, 5.0),
       sparkConfig = SparkConfig(16, "UTC", true)
     )
-    val pipeline = new EnhancedDataCleaningPipeline(testConfig)
+    val pipeline = new DataCleaningPipeline(testConfig)
     
     // When: Partition skew is analyzed
     val skewMetrics = pipeline.analyzePartitionSkew("non-existent-path")

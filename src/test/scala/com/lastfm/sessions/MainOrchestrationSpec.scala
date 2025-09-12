@@ -205,7 +205,7 @@ class MainOrchestrationSpec extends AnyFlatSpec with Matchers {
     
     PipelineConfig(
       bronzePath = bronzePath,
-      silverPath = s"$silverDir/orchestration-output.tsv",
+      silverPath = s"$silverDir/orchestration-output", // Parquet directory, not .tsv file
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")

@@ -1,6 +1,7 @@
 package com.lastfm.sessions.orchestration
 
-import com.lastfm.sessions.pipelines.{PipelineConfig, DataCleaningPipeline, DistributedSessionAnalysisPipeline}
+import com.lastfm.sessions.pipelines.{PipelineConfig, DistributedSessionAnalysisPipeline}
+import com.lastfm.sessions.application.{DataCleaningServiceFactory, DistributedSessionAnalysisFactory}
 import com.lastfm.sessions.domain.DataQualityMetrics
 import org.apache.spark.sql.SparkSession
 import scala.util.{Try, Success, Failure}
@@ -53,30 +54,31 @@ object PipelineOrchestrator {
   }
 
   /**
-   * Executes Data Cleaning Pipeline (Bronze → Silver transformation).
+   * Executes Data Cleaning Service (Bronze → Silver transformation).
    */
   private def executeDataCleaningPipeline(config: PipelineConfig): PipelineExecutionResult = {
-    println("🧹 Executing Data Cleaning Pipeline (Bronze → Silver)")
+    println("🧹 Executing Data Cleaning Service (Bronze → Silver)")
     
     using(SparkSessionManager.createProductionSession()) { implicit spark =>
-      val pipeline = new DataCleaningPipeline(config)
-      val result = pipeline.execute()
+      val service = DataCleaningServiceFactory.createProductionService
+      val result = service.cleanData(config.bronzePath, config.silverPath)
       
       result match {
         case Success(qualityMetrics: DataQualityMetrics) =>
           println(s"✅ Data cleaning completed successfully")
           println(f"   Quality Score: ${qualityMetrics.qualityScore}%.6f%%")
           println(s"   Records: ${qualityMetrics.totalRecords} → ${qualityMetrics.validRecords}")
+          println(s"   Format: Parquet with optimal userId partitioning")
           PipelineExecutionResult.DataCleaningCompleted
           
         case Failure(exception) =>
-          throw new RuntimeException("Data cleaning pipeline failed", exception)
+          throw new RuntimeException("Data cleaning service failed", exception)
       }
     }
   }
 
   /**
-   * Executes Distributed Session Analysis Pipeline (Silver → Gold transformation).
+   * Executes Distributed Session Analysis Service (Silver → Gold transformation).
    * 
    * Implements memory-efficient distributed session analysis processing:
    * - Loads cleaned listening events from Silver layer as distributed streams
@@ -91,11 +93,11 @@ object PipelineOrchestrator {
    * - Single-pass aggregations for metrics calculation
    */
   private def executeSessionAnalysisPipeline(config: PipelineConfig): PipelineExecutionResult = {
-    println("🔄 Executing Distributed Session Analysis Pipeline (Silver → Gold)")
+    println("🔄 Executing Distributed Session Analysis Service (Silver → Gold)")
     
     using(SparkSessionManager.createProductionSession()) { implicit spark =>
-      val pipeline = DistributedSessionAnalysisPipeline.createProduction(config)
-      val result = pipeline.execute()
+      val service = DistributedSessionAnalysisFactory.createProductionService
+      val result = service.analyzeUserSessions(config.silverPath, "data/output/gold")
       
       result match {
         case Success(analysis) =>
@@ -108,7 +110,7 @@ object PipelineOrchestrator {
           PipelineExecutionResult.SessionAnalysisCompleted
           
         case Failure(exception) =>
-          throw new RuntimeException("Distributed session analysis pipeline failed", exception)
+          throw new RuntimeException("Distributed session analysis service failed", exception)
       }
     }
   }

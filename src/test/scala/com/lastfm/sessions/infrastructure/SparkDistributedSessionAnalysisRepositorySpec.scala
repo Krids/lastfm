@@ -151,67 +151,75 @@ class SparkDistributedSessionAnalysisRepositorySpec extends AnyFlatSpec with Mat
   }
   
   /**
-   * Creates test Silver layer data in memory for testing.
+   * Creates test Silver layer data in Parquet format for testing.
    */
   private def createTestSilverData(): String = {
     import spark.implicits._
     
     val testEvents = Seq(
-      ("user1", "2023-01-01T10:00:00", "artist1", "Artist One", "track1", "Track One", "Artist One — Track One"),
-      ("user1", "2023-01-01T10:15:00", "artist1", "Artist One", "track2", "Track Two", "Artist One — Track Two"),
-      ("user1", "2023-01-01T10:45:00", "artist2", "Artist Two", "track3", "Track Three", "Artist Two — Track Three"),
-      ("user2", "2023-01-01T11:00:00", "artist1", "Artist One", "track1", "Track One", "Artist One — Track One"),
-      ("user2", "2023-01-01T11:15:00", "artist2", "Artist Two", "track4", "Track Four", "Artist Two — Track Four")
+      ("user1", "2023-01-01T10:00:00Z", "artist1", "Artist One", "track1", "Track One", "Artist One — Track One"),
+      ("user1", "2023-01-01T10:15:00Z", "artist1", "Artist One", "track2", "Track Two", "Artist One — Track Two"),
+      ("user1", "2023-01-01T10:45:00Z", "artist2", "Artist Two", "track3", "Track Three", "Artist Two — Track Three"),
+      ("user2", "2023-01-01T11:00:00Z", "artist1", "Artist One", "track1", "Track One", "Artist One — Track One"),
+      ("user2", "2023-01-01T11:15:00Z", "artist2", "Artist Two", "track4", "Track Four", "Artist Two — Track Four")
     )
     
     val df = testEvents.toDF("userId", "timestamp", "artistId", "artistName", "trackId", "trackName", "trackKey")
     val tempPath = s"${System.getProperty("java.io.tmpdir")}/test-silver-data"
     
+    // Ensure data is actually written by forcing evaluation
     df.coalesce(1)
       .write
       .mode("overwrite")
-      .option("header", "false")
-      .option("delimiter", "\t")
-      .csv(tempPath)
+      .option("compression", "snappy")
+      .parquet(tempPath)
+    
+    // Verify data was written
+    val verifyDF = spark.read.parquet(tempPath)
+    verifyDF.count() // Force evaluation to ensure data is written
     
     tempPath
   }
   
   /**
-   * Creates test data with specific time gaps for session boundary testing.
+   * Creates test data with specific time gaps for session boundary testing in Parquet format.
    */
   private def createTestSilverDataWithTimeGaps(): String = {
     import spark.implicits._
     
     val testEvents = Seq(
-      ("user1", "2023-01-01T10:00:00", "artist1", "Artist One", "track1", "Track One", "Artist One — Track One"),
-      ("user1", "2023-01-01T10:15:00", "artist1", "Artist One", "track2", "Track Two", "Artist One — Track Two"),
-      ("user1", "2023-01-01T10:45:00", "artist2", "Artist Two", "track3", "Track Three", "Artist Two — Track Three"), // 30 min gap - new session
-      ("user1", "2023-01-01T11:00:00", "artist2", "Artist Two", "track4", "Track Four", "Artist Two — Track Four")
+      ("user1", "2023-01-01T10:00:00Z", "artist1", "Artist One", "track1", "Track One", "Artist One — Track One"),
+      ("user1", "2023-01-01T10:15:00Z", "artist1", "Artist One", "track2", "Track Two", "Artist One — Track Two"),
+      ("user1", "2023-01-01T10:45:00Z", "artist2", "Artist Two", "track3", "Track Three", "Artist Two — Track Three"), // 30 min gap - new session
+      ("user1", "2023-01-01T11:00:00Z", "artist2", "Artist Two", "track4", "Track Four", "Artist Two — Track Four")
     )
     
     val df = testEvents.toDF("userId", "timestamp", "artistId", "artistName", "trackId", "trackName", "trackKey")
     val tempPath = s"${System.getProperty("java.io.tmpdir")}/test-silver-data-gaps"
     
+    // Ensure data is actually written by forcing evaluation
     df.coalesce(1)
       .write
       .mode("overwrite")
-      .option("header", "false")
-      .option("delimiter", "\t")
-      .csv(tempPath)
+      .option("compression", "snappy")
+      .parquet(tempPath)
+    
+    // Verify data was written
+    val verifyDF = spark.read.parquet(tempPath)
+    verifyDF.count() // Force evaluation to ensure data is written
     
     tempPath
   }
-  
+
   /**
-   * Creates larger test dataset for performance testing.
+   * Creates larger test dataset for performance testing in Parquet format.
    */
   private def createLargeTestSilverData(numEvents: Int): String = {
     import spark.implicits._
     
     val testEvents = (1 to numEvents).map { i =>
       val userId = s"user${i % 100}" // 100 users
-      val timestamp = f"2023-01-01T${10 + (i % 12)}:${i % 60}:00"
+      val timestamp = f"2023-01-01T${10 + (i % 12)}%02d:${i % 60}%02d:00Z"
       val artistId = s"artist${i % 50}"
       val artistName = s"Artist ${i % 50}"
       val trackId = s"track${i}"
@@ -224,12 +232,16 @@ class SparkDistributedSessionAnalysisRepositorySpec extends AnyFlatSpec with Mat
     val df = testEvents.toDF("userId", "timestamp", "artistId", "artistName", "trackId", "trackName", "trackKey")
     val tempPath = s"${System.getProperty("java.io.tmpdir")}/test-silver-data-large"
     
+    // Ensure data is actually written by forcing evaluation
     df.coalesce(4) // Multiple partitions for distributed processing
       .write
       .mode("overwrite")
-      .option("header", "false")
-      .option("delimiter", "\t")
-      .csv(tempPath)
+      .option("compression", "snappy")
+      .parquet(tempPath)
+    
+    // Verify data was written
+    val verifyDF = spark.read.parquet(tempPath)
+    verifyDF.count() // Force evaluation to ensure data is written
     
     tempPath
   }

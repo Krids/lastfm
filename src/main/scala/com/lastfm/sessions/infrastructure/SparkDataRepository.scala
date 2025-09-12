@@ -14,11 +14,13 @@ import scala.util.control.NonFatal
  * Spark-based implementation of DataRepositoryPort for loading LastFM listening events.
  * 
  * This implementation uses Apache Spark to efficiently process large TSV files containing
- * listening event data. It handles data validation, schema enforcement, and error recovery
- * while maintaining the contract defined by the DataRepositoryPort interface.
+ * listening event data and outputs cleaned data in Parquet format for optimal performance.
+ * It handles data validation, schema enforcement, and error recovery while maintaining 
+ * the contract defined by the DataRepositoryPort interface.
  * 
  * Key features:
- * - Efficient TSV parsing with schema validation
+ * - Efficient TSV parsing with schema validation (Bronze layer input)
+ * - Parquet output with strategic userId partitioning (Silver layer output)
  * - Data quality filtering for malformed records
  * - Unicode character support for international content
  * - Memory-efficient processing for large datasets
@@ -508,57 +510,6 @@ class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPo
   // Note: Old session analysis persistence methods removed.
   // Replaced by DistributedSessionAnalysisRepository with distributed processing.
 
-  /**
-   * Writes cleaned listening events to Silver layer in TSV format.
-   * 
-   * Creates Silver layer artifacts using Spark's distributed write capabilities:
-   * - TSV format (tab-separated values) for consistency with input format
-   * - Partitioned output for optimal downstream processing
-   * - UTF-8 encoding for international character support
-   * - Overwrite mode to ensure clean Silver layer artifacts
-   */
-  private def writeCleanedDataToSilver(events: List[ListenEvent], outputPath: String): Unit = {
-    // Convert ListenEvent objects back to DataFrame for efficient writing
-    val eventsDF = spark.createDataFrame(events.map { event =>
-      (
-        event.userId,
-        event.timestamp.toString,
-        event.artistId.orNull,
-        event.artistName,
-        event.trackId.orNull,
-        event.trackName,
-        event.trackKey
-      )
-    }).toDF("userId", "timestamp", "artistId", "artistName", "trackId", "trackName", "trackKey")
-    
-    // Write to Silver layer in proper TSV format
-    // Convert DataFrame to TSV strings and write as text files with .tsv extension
-    val tsvDataPath = outputPath + "_tsv_data"
-    
-    // Convert DataFrame rows to TSV format strings
-    val tsvStrings = eventsDF
-      .coalesce(1) // Ensure single output file for smaller datasets
-      .rdd
-      .map(row => {
-        // Create TSV row with tab-separated values
-        Seq(
-          row.getString(0), // userId
-          row.getString(1), // timestamp
-          Option(row.getString(2)).getOrElse(""), // artistId (nullable)
-          row.getString(3), // artistName
-          Option(row.getString(4)).getOrElse(""), // trackId (nullable)
-          row.getString(5), // trackName
-          row.getString(6)  // trackKey
-        ).mkString("\t")
-      })
-    
-    // Write as TSV text files with proper .tsv extension
-    spark.createDataset(tsvStrings)
-      .write
-      .mode("overwrite")
-      .option("encoding", "UTF-8")
-      .text(tsvDataPath)
-  }
 
   private def writeQualityReport(metrics: DataQualityMetrics, outputPath: String): Unit = {
     val qualityReportPath = getQualityReportPath(outputPath)

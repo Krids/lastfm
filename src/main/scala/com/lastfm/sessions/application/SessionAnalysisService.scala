@@ -1,6 +1,7 @@
 package com.lastfm.sessions.application
 
 import com.lastfm.sessions.domain._
+import com.lastfm.sessions.application.QualityValidationResult
 import scala.util.{Try, Success, Failure}
 import scala.util.control.NonFatal
 
@@ -196,23 +197,3 @@ class SessionAnalysisService(repository: DistributedSessionAnalysisRepository) {
   }
 }
 
-/**
- * Result of session analysis quality validation.
- * 
- * Provides comprehensive quality assessment for business decision making.
- * 
- * @param qualityScore Numerical quality score (0-100)
- * @param qualityAssessment Categorical quality assessment
- * @param performanceCategory User engagement performance category
- * @param isSessionAnalysisReady Whether data is ready for session analysis
- * @param isProductionReady Whether analysis meets production quality standards
- */
-case class QualityValidationResult(
-  qualityScore: Double,
-  qualityAssessment: QualityAssessment,
-  performanceCategory: PerformanceCategory,
-  isSessionAnalysisReady: Boolean,
-  isProductionReady: Boolean
-) {
-  require(qualityScore >= 0.0 && qualityScore <= 100.0, "qualityScore must be between 0 and 100")
-}
