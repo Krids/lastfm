@@ -22,6 +22,7 @@ data/output/gold/*.tsv          # Generated session analysis results
 data/output/gold/*.parquet
 data/output/gold/*.json         # Generated session metrics
 data/output/gold/*_spark_output/    # Spark output directories
+data/output/gold/listening-events-cleaned-session-analytics
 
 # Results Layer (Final Pipeline Output) - Exclude generated artifacts, keep structure
 data/output/results/*.parquet
