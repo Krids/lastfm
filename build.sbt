@@ -41,12 +41,11 @@ lazy val root = (project in file("."))
     fork := true,
     Test / fork := true,
     
-    // Main execution JVM options (production-ready settings)
+    // Main execution JVM options (Java 11 compatible)
     run / javaOptions ++= Seq(
       // Memory management
       "-Xmx12g",                        // 12GB heap for development
       "-XX:+UseG1GC",                   // G1 garbage collector
-      "-XX:+UseContainerSupport",       // Docker/container awareness
       "-XX:G1HeapRegionSize=16m",       // Optimal region size
       "-XX:MaxGCPauseMillis=200",       // Low-latency GC
       
@@ -76,9 +75,8 @@ lazy val root = (project in file("."))
       "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
       "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED",
       
-      // Performance and debugging
+      // Performance and debugging (Java 11 compatible)
       "-XX:+UnlockExperimentalVMOptions",
-      "-XX:+UseJVMCICompiler",
       "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn"
     ),
     Test / javaOptions ++= Seq(

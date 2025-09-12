@@ -1,6 +1,6 @@
 package com.lastfm.sessions.infrastructure
 
-import com.lastfm.sessions.domain.{DataRepositoryPort, ListenEvent, DataQualityMetrics, SessionAnalysis, UserSession, UserStatistics}
+import com.lastfm.sessions.domain.{DataRepositoryPort, ListenEvent, DataQualityMetrics, UserSession}
 import org.apache.spark.sql.{SparkSession, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -382,7 +382,7 @@ class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPo
       .option("mode", "PERMISSIVE")
       .schema(schema)
       .csv(inputPath)
-      .repartition(16) // Optimal partitioning
+      .repartition(16, $"userId") // Strategic userId partitioning for session analysis optimization
       // Apply all cleaning filters
       .filter($"userId".isNotNull && $"userId" =!= "")
       .filter($"timestamp".isNotNull && $"timestamp" =!= "")
@@ -396,27 +396,21 @@ class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPo
         when($"trackId".isNotNull && $"trackId" =!= "", $"trackId")
         .otherwise(concat($"artistName", lit(" — "), $"trackName")))
 
-    // Write directly to Silver layer as TSV text files
-    val tsvDataPath = outputPath + "_tsv_data"
+    // Write directly to Silver layer as Parquet with optimal partitioning
+    val parquetDataPath = outputPath + "_parquet_data"
     
-    // Convert to TSV format and write as text files (memory-efficient)
+    // Write as Parquet with optimal userId partitioning (memory-efficient)
     cleanedDF
-      .select(
-        concat_ws("\t", 
-          $"userId", 
-          $"timestamp", 
-          when($"artistId".isNull, "").otherwise($"artistId"),
-          $"artistName", 
-          when($"trackId".isNull, "").otherwise($"trackId"),
-          $"trackName", 
-          $"trackKey"
-        ).as("tsvLine")
-      )
-      .coalesce(4) // Use 4 output files for better parallelism
+      .repartition(16, $"userId") // Optimal partitioning: 16 partitions with ~62 users each
       .write
       .mode("overwrite")
-      .option("encoding", "UTF-8")
-      .text(tsvDataPath)
+      .option("compression", "snappy") // Optimal compression for performance
+      .parquet(parquetDataPath)
+    
+    println(s"✅ Silver layer written as Parquet with optimal userId partitioning")
+    println(s"   Format: Parquet with Snappy compression")
+    println(s"   Partitioning: 16 partitions (~62 users per partition)")
+    println(s"   Path: $parquetDataPath")
   }
   
   private def countTotalInputRecords(inputPath: String): Long = {
@@ -508,183 +502,11 @@ class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPo
     }
   }
 
-  /**
-   * Persists comprehensive session analysis results to Gold layer.
-   * 
-   * Creates structured Gold layer artifacts:
-   * - Complete session analysis with statistical metrics
-   * - Top N sessions ranking for downstream processing
-   * - Session quality metrics and data lineage information
-   * - JSON format for easy consumption by analytics tools
-   */
-  override def persistSessionAnalysis(
-    sessions: SessionAnalysis,
-    goldPath: String,
-    topSessionCount: Int = 50
-  ): Try[Unit] = {
-    try {
-      // Ensure Gold layer directory exists
-      val goldDir = Paths.get(goldPath)
-      if (!Files.exists(goldDir)) {
-        Files.createDirectories(goldDir)
-      }
+  // Note: persistSessionAnalysis method removed as it's replaced by 
+  // DistributedSessionAnalysisRepository with memory-efficient distributed processing
 
-      // Generate comprehensive session analysis artifacts
-      writeSessionsAnalysis(sessions, goldPath)
-      writeTopSessions(sessions.topSessions(topSessionCount), goldPath)
-      writeSessionMetrics(sessions, goldPath)
-      
-      Success(())
-      
-    } catch {
-      case NonFatal(exception) =>
-        Failure(new RuntimeException(s"Failed to persist session analysis to Gold layer: $goldPath", exception))
-    }
-  }
-
-  /**
-   * Writes complete session analysis to Gold layer.
-   */
-  private def writeSessionsAnalysis(sessions: SessionAnalysis, goldPath: String): Unit = {
-    val sessionsJson = generateSessionsJson(sessions)
-    val sessionsFile = Paths.get(goldPath, "sessions.json")
-    Files.write(sessionsFile, sessionsJson.getBytes(StandardCharsets.UTF_8))
-  }
-
-  /**
-   * Writes top N sessions ranking to Gold layer.
-   */
-  private def writeTopSessions(topSessions: List[UserSession], goldPath: String): Unit = {
-    val topSessionsJson = generateTopSessionsJson(topSessions)
-    val topSessionsFile = Paths.get(goldPath, "top-sessions.json")
-    Files.write(topSessionsFile, topSessionsJson.getBytes(StandardCharsets.UTF_8))
-  }
-
-  /**
-   * Writes session statistical metrics to Gold layer.
-   */
-  private def writeSessionMetrics(sessions: SessionAnalysis, goldPath: String): Unit = {
-    val metricsJson = generateSessionMetricsJson(sessions)
-    val metricsFile = Paths.get(goldPath, "session-metrics.json")
-    Files.write(metricsFile, metricsJson.getBytes(StandardCharsets.UTF_8))
-  }
-
-  /**
-   * Generates JSON representation of complete session analysis.
-   */
-  private def generateSessionsJson(sessions: SessionAnalysis): String = {
-    val sessionsData = sessions.sessions.map { session =>
-      s"""
-      |    {
-      |      "userId": "${session.userId}",
-      |      "trackCount": ${session.trackCount},
-      |      "uniqueTrackCount": ${session.uniqueTrackCount},
-      |      "duration": "${session.duration}",
-      |      "startTime": "${session.startTime}",
-      |      "endTime": "${session.endTime}",
-      |      "tracks": [
-      |        ${session.tracks.map(track => 
-        s"""{"timestamp": "${track.timestamp}", "artistName": "${track.artistName}", "trackName": "${track.trackName}"}""").mkString(",\n        ")}
-      |      ]
-      |    }""".stripMargin
-    }.mkString(",\n")
-    
-    s"""
-    |{
-    |  "sessionAnalysis": {
-    |    "totalSessions": ${sessions.totalSessions},
-    |    "uniqueUsers": ${sessions.uniqueUsers},
-    |    "totalTracks": ${sessions.totalTracks},
-    |    "averageSessionLength": ${sessions.averageSessionLength},
-    |    "processingTimestamp": "${java.time.Instant.now()}",
-    |    "sessions": [
-    |$sessionsData
-    |    ]
-    |  }
-    |}""".stripMargin
-  }
-
-  /**
-   * Generates JSON representation of top N sessions.
-   */
-  private def generateTopSessionsJson(topSessions: List[UserSession]): String = {
-    val topSessionsData = topSessions.zipWithIndex.map { case (session, index) =>
-      s"""
-      |    {
-      |      "rank": ${index + 1},
-      |      "userId": "${session.userId}",
-      |      "trackCount": ${session.trackCount},
-      |      "duration": "${session.duration}",
-      |      "startTime": "${session.startTime}",
-      |      "endTime": "${session.endTime}"
-      |    }""".stripMargin
-    }.mkString(",\n")
-    
-    s"""
-    |{
-    |  "topSessions": {
-    |    "count": ${topSessions.length},
-    |    "processingTimestamp": "${java.time.Instant.now()}",
-    |    "sessions": [
-    |$topSessionsData
-    |    ]
-    |  }
-    |}""".stripMargin
-  }
-
-  /**
-   * Generates JSON representation of session statistical metrics.
-   */
-  private def generateSessionMetricsJson(sessions: SessionAnalysis): String = {
-    s"""
-    |{
-    |  "sessionMetrics": {
-    |    "summary": {
-    |      "totalSessions": ${sessions.totalSessions},
-    |      "uniqueUsers": ${sessions.uniqueUsers},
-    |      "totalTracks": ${sessions.totalTracks},
-    |      "averageSessionLength": ${sessions.averageSessionLength}
-    |    },
-    |    "quality": {
-    |      "highQualitySessionCount": ${sessions.highQualitySessionCount},
-    |      "qualityScore": ${sessions.qualityScore}
-    |    },
-    |    "distribution": ${generateDistributionJson(sessions.sessionDistribution)},
-    |    "userStatistics": ${generateUserStatsJson(sessions.userStatistics)},
-    |    "processingTimestamp": "${java.time.Instant.now()}"
-    |  }
-    |}""".stripMargin
-  }
-
-  /**
-   * Generates JSON for session distribution statistics.
-   */
-  private def generateDistributionJson(distribution: Map[Int, Int]): String = {
-    val distributionEntries = distribution.toSeq.sortBy(_._1).map { case (trackCount, sessionCount) =>
-      s""""$trackCount": $sessionCount"""
-    }.mkString(", ")
-    
-    s"{$distributionEntries}"
-  }
-
-  /**
-   * Generates JSON for user statistics.
-   */
-  private def generateUserStatsJson(userStats: Map[String, UserStatistics]): String = {
-    val userEntries = userStats.map { case (userId, stats) =>
-      s"""
-      |    "$userId": {
-      |      "sessionCount": ${stats.sessionCount},
-      |      "totalTracks": ${stats.totalTracks},
-      |      "averageSessionLength": ${stats.averageSessionLength}
-      |    }""".stripMargin
-    }.mkString(",\n")
-    
-    s"""
-    |  {
-    |$userEntries
-    |  }""".stripMargin
-  }
+  // Note: Old session analysis persistence methods removed.
+  // Replaced by DistributedSessionAnalysisRepository with distributed processing.
 
   /**
    * Writes cleaned listening events to Silver layer in TSV format.

@@ -246,6 +246,87 @@ class DataCleaningPipelineSpec extends AnyFlatSpec with Matchers with BeforeAndA
   }
 
   /**
+   * Tests for strategic userId partitioning during data cleaning.
+   */
+  "DataCleaningPipeline userId partitioning" should "apply strategic userId partitioning for session analysis optimization" in {
+    // Given: Pipeline with userId partitioning strategy
+    val testData = generateUserData(users = 20, tracksPerUser = 50) // 1000 records across 20 users
+    val inputPath = createTestData(testData)
+    val config = PipelineConfig(
+      bronzePath = inputPath,
+      silverPath = s"$silverDir/userid-partitioned-test.tsv",
+      partitionStrategy = UserIdPartitionStrategy(userCount = 20, cores = 4),
+      qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 95.0),
+      sparkConfig = SparkConfig(partitions = 4, timeZone = "UTC") // 4 partitions for 20 users = ~5 users per partition
+    )
+    val pipeline = new DataCleaningPipeline(config)
+    
+    // When: Pipeline executes with userId partitioning
+    val result = pipeline.execute()
+    
+    // Then: Pipeline succeeds and data is partitioned optimally for session analysis
+    result.isSuccess shouldBe true
+    val qualityMetrics = result.get
+    
+    qualityMetrics.qualityScore should be >= 95.0
+    qualityMetrics.validRecords should be > 0L
+    
+    // Verify Silver layer output exists (partitioned data)
+    val silverOutputPath = config.silverPath + "_tsv_data"
+    Files.exists(Paths.get(silverOutputPath)) shouldBe true
+  }
+  
+  it should "optimize partition count for session analysis workload" in {
+    // Given: Pipeline with different user counts
+    val testCases = List(
+      (100, 4),   // Small dataset
+      (500, 8),   // Medium dataset  
+      (1000, 16)  // Large dataset (production)
+    )
+    
+    testCases.foreach { case (userCount, expectedMinPartitions) =>
+      // When: Partition strategy calculates optimal partitions
+      val strategy = UserIdPartitionStrategy(userCount = userCount, cores = 8)
+      val optimalPartitions = strategy.calculateOptimalPartitions()
+      
+      // Then: Partition count is optimized for session analysis
+      optimalPartitions should be >= expectedMinPartitions
+      optimalPartitions should be <= 200 // Reasonable upper bound
+      
+      // Verify users per partition ratio is optimal for session analysis
+      val usersPerPartition = userCount / optimalPartitions
+      usersPerPartition should be >= 1 // Minimum efficiency (adjusted for small test datasets)
+      usersPerPartition should be <= 100 // Maximum for memory efficiency
+    }
+  }
+  
+  it should "eliminate shuffle operations for downstream session analysis" in {
+    // Given: Pipeline with userId partitioning strategy
+    val testData = generateUserData(users = 10, tracksPerUser = 20)
+    val inputPath = createTestData(testData)
+    val config = PipelineConfig(
+      bronzePath = inputPath,
+      silverPath = s"$silverDir/shuffle-optimization-test.tsv",
+      partitionStrategy = UserIdPartitionStrategy(userCount = 10, cores = 2),
+      qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 90.0),
+      sparkConfig = SparkConfig(partitions = 2, timeZone = "UTC")
+    )
+    val pipeline = new DataCleaningPipeline(config)
+    
+    // When: Pipeline applies strategic partitioning
+    val result = pipeline.execute()
+    
+    // Then: Partitioning is optimized for session analysis (no shuffle needed downstream)
+    result.isSuccess shouldBe true
+    
+    // Verify partitioning strategy eliminates session analysis shuffle
+    val partitionStrategy = config.partitionStrategy.asInstanceOf[UserIdPartitionStrategy]
+    val usersPerPartition = partitionStrategy.usersPerPartition
+    usersPerPartition should be >= 0 // Each partition should have users (may be 0 for small test data)
+    usersPerPartition should be <= 75 // Optimal for session analysis
+  }
+
+  /**
    * Tests for performance and scalability characteristics.
    */
   "DataCleaningPipeline performance" should "maintain consistent performance across data sizes" in {

@@ -1,6 +1,6 @@
 package com.lastfm.sessions.orchestration
 
-import com.lastfm.sessions.pipelines.{PipelineConfig, DataCleaningPipeline, SessionAnalysisPipeline}
+import com.lastfm.sessions.pipelines.{PipelineConfig, DataCleaningPipeline, DistributedSessionAnalysisPipeline}
 import com.lastfm.sessions.domain.DataQualityMetrics
 import org.apache.spark.sql.SparkSession
 import scala.util.{Try, Success, Failure}
@@ -76,31 +76,39 @@ object PipelineOrchestrator {
   }
 
   /**
-   * Executes Session Analysis Pipeline (Silver → Gold transformation).
+   * Executes Distributed Session Analysis Pipeline (Silver → Gold transformation).
    * 
-   * Implements comprehensive session analysis processing:
-   * - Loads cleaned listening events from Silver layer
-   * - Applies 20-minute gap algorithm for session calculation
-   * - Generates statistical analysis and top sessions ranking
+   * Implements memory-efficient distributed session analysis processing:
+   * - Loads cleaned listening events from Silver layer as distributed streams
+   * - Applies 20-minute gap algorithm using Spark window functions
+   * - Generates comprehensive analysis without driver memory constraints
    * - Persists structured Gold layer artifacts for downstream consumption
+   * 
+   * Key Improvements:
+   * - No OutOfMemoryError issues with large datasets (19M+ records)
+   * - Distributed processing using Spark DataFrames throughout
+   * - Window functions for efficient session boundary detection
+   * - Single-pass aggregations for metrics calculation
    */
   private def executeSessionAnalysisPipeline(config: PipelineConfig): PipelineExecutionResult = {
-    println("🔄 Executing Session Analysis Pipeline (Silver → Gold)")
+    println("🔄 Executing Distributed Session Analysis Pipeline (Silver → Gold)")
     
     using(SparkSessionManager.createProductionSession()) { implicit spark =>
-      val pipeline = new SessionAnalysisPipeline(config)
+      val pipeline = DistributedSessionAnalysisPipeline.createProduction(config)
       val result = pipeline.execute()
       
       result match {
         case Success(analysis) =>
-          println(s"✅ Session analysis completed successfully")
-          println(f"   Sessions Generated: ${analysis.totalSessions}")
-          println(f"   Users Analyzed: ${analysis.uniqueUsers}")
-          println(f"   Quality Score: ${analysis.qualityScore}%.2f%%")
+          println(s"✅ Distributed session analysis completed successfully")
+          println(f"   Sessions Generated: ${analysis.metrics.totalSessions}")
+          println(f"   Users Analyzed: ${analysis.metrics.uniqueUsers}")
+          println(f"   Quality Score: ${analysis.metrics.qualityScore}%.2f%%")
+          println(f"   Quality Assessment: ${analysis.qualityAssessment}")
+          println(f"   Performance Category: ${analysis.performanceCategory}")
           PipelineExecutionResult.SessionAnalysisCompleted
           
         case Failure(exception) =>
-          throw new RuntimeException("Session analysis pipeline failed", exception)
+          throw new RuntimeException("Distributed session analysis pipeline failed", exception)
       }
     }
   }

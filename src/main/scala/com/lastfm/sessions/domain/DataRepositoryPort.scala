@@ -96,9 +96,6 @@ trait DataRepositoryPort {
    * @param topSessionCount Number of top sessions to extract (default 50)
    * @return Try containing success confirmation or error
    */
-  def persistSessionAnalysis(
-    sessions: SessionAnalysis, 
-    goldPath: String,
-    topSessionCount: Int = 50
-  ): Try[Unit]
+  // Note: persistSessionAnalysis method removed as it's replaced by 
+  // DistributedSessionAnalysisRepository with different interface
 }
