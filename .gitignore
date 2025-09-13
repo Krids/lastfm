@@ -42,6 +42,11 @@ data/output/**/*_spark_output/
 !data/output/gold/.gitkeep
 !data/output/results/.gitkeep
 
+# Allow final results to be committed (test requirement)
+!data/output/results/*.tsv
+!data/output/results/*.txt
+!data/output/results/*.json
+
 # General data file exclusions
 *.tsv                          # Generated TSV files everywhere
 *.csv                          # Large CSV files

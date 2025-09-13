@@ -1,0 +1,67 @@
+name: 'Setup Scala Environment'
+description: 'Setup Java 11, install SBT, and configure caching for Scala projects'
+author: 'LastFM Data Engineering Team'
+
+inputs:
+  java-version:
+    description: 'Java version to install'
+    required: false
+    default: '11'
+  java-distribution:
+    description: 'Java distribution'
+    required: false
+    default: 'temurin'
+
+outputs:
+  java-version:
+    description: 'The installed Java version'
+    value: ${{ steps.java-setup.outputs.version }}
+  sbt-version:
+    description: 'The installed SBT version'
+    value: ${{ steps.sbt-install.outputs.version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: "Setup Java ${{ inputs.java-version }}"
+      id: java-setup
+      uses: actions/setup-java@v4
+      with:
+        distribution: ${{ inputs.java-distribution }}
+        java-version: ${{ inputs.java-version }}
+    
+    - name: "Install SBT"
+      id: sbt-install
+      shell: bash
+      run: |
+        echo "📦 Installing SBT..."
+        # Install SBT using the official installation method
+        echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list
+        echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | sudo tee /etc/apt/sources.list.d/sbt_old.list
+        curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo apt-key add
+        sudo apt-get update
+        sudo apt-get install sbt
+        echo "✅ SBT installed successfully"
+        
+        # Output version for verification
+        SBT_VERSION=$(sbt --version | tail -1)
+        echo "version=$SBT_VERSION" >> $GITHUB_OUTPUT
+        echo "SBT version: $SBT_VERSION"
+    
+    - name: "Cache SBT Dependencies"
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.sbt
+          ~/.ivy2/cache
+          ~/.coursier/cache
+          target/resolution-cache
+          project/target/resolution-cache
+        key: sbt-cache-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/**/*.scala') }}
+        restore-keys: |
+          sbt-cache-${{ runner.os }}-
+          sbt-cache-
+
+branding:
+  icon: 'code'
+  color: 'red'
