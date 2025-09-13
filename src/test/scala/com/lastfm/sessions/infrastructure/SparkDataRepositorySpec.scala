@@ -15,7 +15,7 @@ import java.time.Instant
  * Each test focuses on one specific aspect of Spark integration,
  * ensuring clear validation and focused failure diagnosis.
  * 
- * @author LastFM Session Analysis Team
+ * @author Felipe Lana Machado
  * @since 1.0.0
  */
 class SparkDataRepositorySpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {

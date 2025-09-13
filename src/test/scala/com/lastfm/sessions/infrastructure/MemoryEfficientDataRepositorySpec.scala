@@ -32,29 +32,10 @@ class MemoryEfficientDataRepositorySpec extends AnyFlatSpec with Matchers {
     val testDataPath = createTestDataset(10000)
     
     try {
-      val result = repository.loadListenEventsBatched(testDataPath)
+      val result = repository.loadListenEvents(testDataPath)
       
       result shouldBe a[Success[_]]
       result.get.size should be >= 4500 // Limited by maxReturnSize but should get good sample
-      
-    } finally {
-      Files.deleteIfExists(Paths.get(testDataPath))
-    }
-  }
-
-  it should "calculate quality metrics without loading all events into memory" in {
-    val testDataPath = createTestDataset(5000)
-    
-    try {
-      val result = repository.loadWithDataQualityBatched(testDataPath)
-      
-      result shouldBe a[Success[_]]
-      val (sampleEvents, metrics) = result.get
-      
-      // Should return a sample, not all events
-      sampleEvents.size should be <= 1000 // Sample size limit
-      metrics.totalRecords should be >= 5000L
-      metrics.validRecords should be <= metrics.totalRecords
       
     } finally {
       Files.deleteIfExists(Paths.get(testDataPath))

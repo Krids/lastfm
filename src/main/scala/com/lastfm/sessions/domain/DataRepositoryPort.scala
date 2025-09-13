@@ -22,26 +22,6 @@ trait DataRepositoryPort {
   def loadListenEvents(path: String): Try[List[ListenEvent]]
 
   /**
-   * Loads listening events with comprehensive data quality assessment.
-   * 
-   * This enhanced method performs:
-   * - Critical field validation (userId, timestamp)
-   * - Data standardization (artist/track names, Unicode handling)
-   * - Quality enhancement (deduplication, track key generation)
-   * - Comprehensive quality metrics collection
-   * 
-   * Based on Last.fm dataset analysis requirements:
-   * - Handle 8 empty track names per 19M records
-   * - Process 2 exact duplicates appropriately
-   * - Generate track keys with 88.7% MBID coverage
-   * - Flag 13 suspicious users with >100k plays
-   * 
-   * @param path Path to the data source
-   * @return Try containing tuple of (validated events, quality metrics) or error
-   */
-  def loadWithDataQuality(path: String): Try[(List[ListenEvent], DataQualityMetrics)]
-
-  /**
    * Cleans raw data and persists as artifacts for downstream consumption.
    * 
    * Implements medallion architecture pattern:
@@ -63,20 +43,6 @@ trait DataRepositoryPort {
    * @return Try containing quality metrics or error
    */
   def cleanAndPersist(inputPath: String, outputPath: String): Try[DataQualityMetrics]
-
-  /**
-   * Loads cleaned listening events from Silver layer for session analysis.
-   * 
-   * Optimized for session analysis processing:
-   * - Loads quality-validated events from Silver layer artifacts
-   * - Applies optimal partitioning strategy for session calculation
-   * - Handles large datasets efficiently with distributed processing
-   * - Maintains data lineage from Silver layer processing
-   * 
-   * @param silverPath Path to Silver layer cleaned data (TSV format)
-   * @return Try containing list of validated listening events or error
-   */
-  def loadCleanedEvents(silverPath: String): Try[List[ListenEvent]]
 
   /**
    * Persists session analysis results to Gold layer for downstream consumption.

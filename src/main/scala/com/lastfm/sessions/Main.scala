@@ -46,21 +46,30 @@ object Main extends App {
   println(s"💾 Available Memory: ${Runtime.getRuntime.maxMemory() / 1024 / 1024 / 1024}GB")
 
   try {
-    // Load production configuration
-    val productionConfig = ProductionConfigManager.loadProductionConfig()
-    
-    // Display pipeline selection
+    // Parse arguments first to handle special commands before data validation
     val selectedPipeline = args.headOption.getOrElse("complete")
     println(s"🎯 Selected Pipeline: '$selectedPipeline'")
     
-    // Validate production prerequisites
-    ProductionConfigManager.validateProductionPrerequisites(productionConfig)
-    
-    // Execute selected pipeline through orchestrator
-    val executionResult = PipelineOrchestrator.parseArgsAndExecute(args, productionConfig)
-    
-    // Handle execution results
-    handleExecutionResult(executionResult)
+    // Handle special commands that don't require data validation
+    selectedPipeline match {
+      case "--help" | "help" => 
+        PipelineOrchestrator.displayUsageHelp()
+        sys.exit(0)
+      case "--version" | "version" => 
+        displayVersionInfo()
+        sys.exit(0)
+      case "java" =>
+        displayJavaInfo()
+        sys.exit(0)
+      case _ =>
+        // For actual pipeline execution, load config and validate prerequisites
+        val productionConfig = ProductionConfigManager.loadProductionConfig()
+        ProductionConfigManager.validateProductionPrerequisites(productionConfig)
+        
+        // Execute selected pipeline through orchestrator
+        val executionResult = PipelineOrchestrator.parseArgsAndExecute(args, productionConfig)
+        handleExecutionResult(executionResult)
+    }
     
   } catch {
     case ex: Exception =>
@@ -177,5 +186,36 @@ object Main extends App {
     }
     
     println("=" * 90)
+  }
+
+  /**
+   * Displays version information for container validation.
+   */
+  private def displayVersionInfo(): Unit = {
+    println("🎵 Last.fm Session Analysis - Version Information")
+    println("=" * 60)
+    println(s"📦 Application Version: 1.0.0")
+    println(s"🏗️  Build Environment: Production")
+    println(s"📅 Build Date: ${LocalDateTime.now()}")
+    println(s"☕ Java Version: ${System.getProperty("java.version")}")
+    println(s"🔧 Scala Version: ${scala.util.Properties.versionString}")
+    println(s"🎯 Target Platform: Docker Container")
+    println("=" * 60)
+  }
+
+  /**
+   * Displays Java environment information for container validation.
+   */
+  private def displayJavaInfo(): Unit = {
+    println("☕ Java Environment Information")
+    println("=" * 40)
+    println(s"Version: ${System.getProperty("java.version")}")
+    println(s"Vendor: ${System.getProperty("java.vendor")}")
+    println(s"Home: ${System.getProperty("java.home")}")
+    println(s"VM Name: ${System.getProperty("java.vm.name")}")
+    println(s"VM Version: ${System.getProperty("java.vm.version")}")
+    println(s"Available Processors: ${Runtime.getRuntime.availableProcessors()}")
+    println(s"Max Memory: ${Runtime.getRuntime.maxMemory() / 1024 / 1024}MB")
+    println("=" * 40)
   }
 }

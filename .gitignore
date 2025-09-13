@@ -42,6 +42,11 @@ data/output/**/*_spark_output/
 !data/output/gold/.gitkeep
 !data/output/results/.gitkeep
 
+# Allow final results to be committed (test requirement)
+!data/output/results/*.tsv
+!data/output/results/*.txt
+!data/output/results/*.json
+
 # General data file exclusions
 *.tsv                          # Generated TSV files everywhere
 *.csv                          # Large CSV files
@@ -176,13 +181,6 @@ config/local/
 application-local.conf
 
 # ===========================
-# Docker
-# ===========================
-.dockerignore
-docker-compose.override.yml
-docker-compose.local.yml
-
-# ===========================
 # Infrastructure as Code
 # ===========================
 # Terraform
@@ -280,7 +278,33 @@ data/*.tar.gz
 data/lastfm/lastfm-dataset-1k/userid-timestamp-artid-artname-traid-traname.tsv
 data/lastfm/lastfm-dataset-1k/userid-profile.tsv
 
-# Test artifacts directory
+# ===========================
+# Test Data Isolation - CRITICAL PROTECTION
+# ===========================
+# Test artifacts directory - completely isolated from production
 data/test/
+!data/test/.gitkeep
 /tmp/orchestration-test/
 /tmp/parquet-test/
+
+# Prevent any test artifacts from contaminating production directories
+data/output/*/test-*
+data/output/*/*/test-*
+data/output/**/*test*
+data/output/**/temp-*
+data/output/**/tmp-*
+
+# Spark temporary files
+metastore_db/
+derby.log
+spark-warehouse/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Coverage reports
+target/scala-*/scoverage-data/
+target/scala-*/scoverage-report/
+target/coverage-reports/

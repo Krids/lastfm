@@ -68,46 +68,43 @@ echo "🚀 Starting container..."
 echo "🧹 Cleaning up any existing containers..."
 docker rm -f "lastfm-runner" 2>/dev/null || true
 
-# Smart port handling for non-test pipelines
-if [ "$PIPELINE" != "test" ]; then
-    echo "🔍 Checking port availability for Spark UI..."
-    
-    if check_port_available 4040; then
-        PORT_FLAG="-p 4040:4040"
-        echo "📊 Spark UI will be available at: http://localhost:4040"
-    else
-        echo "⚠️  Port 4040 is in use, checking for alternatives..."
-        # Show what's using port 4040 for debugging
-        PROC_USING_PORT=$(lsof -ti:4040 2>/dev/null | head -1)
-        if [ -n "$PROC_USING_PORT" ]; then
-            PROC_NAME=$(ps -p $PROC_USING_PORT -o comm= 2>/dev/null || echo "unknown")
-            echo "   💡 Port 4040 is being used by: $PROC_NAME (PID: $PROC_USING_PORT)"
-        fi
-        ALTERNATIVE_PORT=$(find_available_port 4041)
-        
-        if [ -n "$ALTERNATIVE_PORT" ]; then
-            PORT_FLAG="-p $ALTERNATIVE_PORT:4040"
-            echo "📊 Spark UI will be available at: http://localhost:$ALTERNATIVE_PORT"
-        else
-            PORT_FLAG=""
-            echo "⚠️  No available ports found (4041-4051), running without Spark UI"
-            echo "💡 You can still monitor progress through console logs"
-        fi
-    fi
-else
-    PORT_FLAG=""
-    echo "🧪 Running tests (no Spark UI needed)"
+# Environment setup
+COMPOSE_FILE="docker-compose.local.yml"
+
+# Check if .env file exists and suggest configuration
+if [ ! -f ".env" ]; then
+    echo "💡 Tip: Create a .env file for custom configuration:"
+    echo "   MEM_LIMIT=12g"
+    echo "   CPU_LIMIT=6"
+    echo "   SPARK_PARTITIONS=16"
+    echo ""
 fi
 
-echo "🐳 Launching Docker container..."
-docker run --rm \
-    --name "lastfm-runner" \
-    --memory="16g" \
-    --cpus="8" \
-    -v "$(pwd)/data:/app/data" \
-    -v "$(pwd)/logs:/app/logs" \
-    $PORT_FLAG \
-    "$IMAGE_NAME" \
-    "$PIPELINE"
+# Use docker-compose for better resource management
+echo "🐳 Launching with docker-compose..."
+if [ "$PIPELINE" = "test" ]; then
+    echo "🧪 Running test suite..."
+    docker-compose -f "$COMPOSE_FILE" run --rm lastfm-test
+else
+    echo "🚀 Running pipeline: $PIPELINE"
+    # Smart port handling
+    if ! check_port_available 4040; then
+        echo "⚠️  Port 4040 is in use, checking for alternatives..."
+        ALTERNATIVE_PORT=$(find_available_port 4041)
+        if [ -n "$ALTERNATIVE_PORT" ]; then
+            export SPARK_UI_PORT="$ALTERNATIVE_PORT"
+            echo "📊 Spark UI will be available at: http://localhost:$ALTERNATIVE_PORT"
+        else
+            echo "⚠️  Running without Spark UI (no available ports)"
+            export SPARK_UI_PORT=""
+        fi
+    else
+        echo "📊 Spark UI will be available at: http://localhost:4040"
+    fi
+    
+    # Set pipeline environment variable and run
+    export PIPELINE="$PIPELINE"
+    docker-compose -f "$COMPOSE_FILE" up --remove-orphans lastfm
+fi
 
 echo "✅ Pipeline completed! Check ./data/output/ for results."

@@ -41,6 +41,18 @@ class AppConfiguration(configPort: ConfigurationPort) {
     configPort.getIntOrDefault("spark.partitions.output", 1)
   
   /**
+   * Gets the Spark driver memory
+   */
+  def sparkDriverMemory: String = 
+    configPort.getStringOrDefault("spark.driver.memory", "4g")
+  
+  /**
+   * Gets the Spark executor memory
+   */
+  def sparkExecutorMemory: String = 
+    configPort.getStringOrDefault("spark.executor.memory", "4g")
+  
+  /**
    * Gets the session gap in minutes
    */
   def sessionGapMinutes: Int = 

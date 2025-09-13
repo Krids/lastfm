@@ -69,40 +69,6 @@ object ProductionConfigManager {
   }
 
   /**
-   * Creates development configuration for testing and iteration.
-   * 
-   * Optimized for fast development cycles with sample data:
-   * - Reduced resource requirements for development environments
-   * - Lower quality thresholds for testing with sample data
-   * - Simplified configuration for rapid iteration
-   */
-  def loadDevelopmentConfig(): PipelineConfig = {
-    PipelineConfig(
-      // Development paths with sample data
-      bronzePath = "data/output/bronze/sample-lastfm-data.tsv",
-      silverPath = "data/output/silver/dev-listening-events-cleaned.tsv",
-      
-      // Development partitioning (smaller scale)
-      partitionStrategy = UserIdPartitionStrategy(userCount = 100, cores = 2),
-      
-      // Relaxed quality thresholds for development
-      qualityThresholds = QualityThresholds(
-        sessionAnalysisMinQuality = 95.0,   // Relaxed for sample data
-        productionMinQuality = 99.0,        // Standard for development
-        minTrackIdCoverage = 70.0,          // Relaxed for sample data
-        maxSuspiciousUserRatio = 10.0       // Higher tolerance for development
-      ),
-      
-      // Development Spark configuration  
-      sparkConfig = SparkConfig(
-        partitions = 4,                      // Minimal partitions for development
-        timeZone = "UTC",
-        adaptiveEnabled = true
-      )
-    )
-  }
-
-  /**
    * Creates medallion architecture directory structure for production deployment.
    * 
    * Creates complete directory hierarchy:

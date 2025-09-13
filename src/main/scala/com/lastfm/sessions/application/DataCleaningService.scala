@@ -19,13 +19,11 @@ import scala.util.control.NonFatal
  * - Apply optimal data processing strategies (validation, partitioning)
  * - Coordinate pipeline operations in correct sequence
  * - Handle cross-cutting concerns (validation, error handling)
- * - Provide clean API for orchestration integration
  * 
  * Design Principles:
  * - Dependency Inversion: Depends on Spark session abstraction
  * - Single Responsibility: Only workflow orchestration, no business logic
  * - Open/Closed: Extensible through configuration
- * - Interface Segregation: Clean, focused public API
  * - Clean Error Handling: Comprehensive failure modes with context
  * 
  * @param spark Spark session for distributed processing
@@ -203,9 +201,19 @@ class DataCleaningService(implicit spark: SparkSession) {
   private def createOptimalPipelineConfig(bronzePath: String, silverPath: String): PipelineConfig = {
     val cores = Runtime.getRuntime.availableProcessors()
     
+    // Determine environment-appropriate paths
+    import com.lastfm.sessions.common.Constants
+    val (goldPath, outputPath) = if (Constants.Environment.isTestEnvironment) {
+      ("data/test/gold", "data/test/results")
+    } else {
+      ("data/output/gold", "data/output/results")
+    }
+    
     PipelineConfig(
       bronzePath = bronzePath,
       silverPath = silverPath,
+      goldPath = goldPath,
+      outputPath = outputPath,
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = cores),
       qualityThresholds = QualityThresholds(
         sessionAnalysisMinQuality = 99.0,
@@ -220,7 +228,7 @@ class DataCleaningService(implicit spark: SparkSession) {
       )
     )
   }
-  
+
   /**
    * Validates input parameters for data cleaning workflow.
    */

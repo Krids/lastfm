@@ -351,8 +351,8 @@ case class QualityAlert(metric: String, threshold: Double, actual: Double) exten
 ---
 
 *Document Version: 1.0*  
-*Last Updated: [Current Date]*  
-*Author: Data Engineering Team*  
+*Last Updated: September 2025*  
+*Author: Felipe Lana Machado*
 *Review Cycle: Before each major release*
 
 
