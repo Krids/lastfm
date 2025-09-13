@@ -1,4 +1,4 @@
-package com.lastfm.sessions.testutil
+package com.lastfm.sessions.utils
 
 import java.nio.file.{Files, Path, Paths}
 import scala.util.Try

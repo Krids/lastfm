@@ -204,7 +204,8 @@ class DataCleaningService(implicit spark: SparkSession) {
     val cores = Runtime.getRuntime.availableProcessors()
     
     // Determine environment-appropriate paths
-    val (goldPath, outputPath) = if (isTestEnvironment) {
+    import com.lastfm.sessions.common.Constants
+    val (goldPath, outputPath) = if (Constants.Environment.isTestEnvironment) {
       ("data/test/gold", "data/test/results")
     } else {
       ("data/output/gold", "data/output/results")
@@ -229,20 +230,7 @@ class DataCleaningService(implicit spark: SparkSession) {
       )
     )
   }
-  
-  /**
-   * Detects if running in test environment.
-   */
-  private def isTestEnvironment: Boolean = {
-    val testIndicators = Seq(
-      sys.props.get("sbt.main.class").exists(_.contains("sbt.")),
-      Thread.currentThread().getStackTrace.exists(_.getClassName.contains("scalatest")),
-      Thread.currentThread().getStackTrace.exists(_.getClassName.contains("Test")),
-      sys.env.get("SBT_TEST").isDefined
-    )
-    testIndicators.exists(identity)
-  }
-  
+
   /**
    * Validates input parameters for data cleaning workflow.
    */

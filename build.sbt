@@ -139,12 +139,10 @@ lazy val root = (project in file("."))
     coverageMinimumBranchTotal := 70,
     coverageFailOnMinimum := false, // Set to true once coverage targets are met
     
-    // Coverage exclusions for generated/infrastructure code
+    // Coverage exclusions - more targeted to get accurate measurement
     coverageExcludedPackages := Seq(
       "<empty>",  // Empty package
-      ".*\\.infrastructure\\..*", // Infrastructure adapters  
-      ".*\\.config\\..*",  // Configuration classes
-      ".*Main.*"  // Main application entry points
+      ".*Main.*"  // Only exclude main entry points
     ).mkString(";"),
     
     // Coverage data directory

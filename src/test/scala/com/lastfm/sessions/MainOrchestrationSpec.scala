@@ -2,7 +2,7 @@ package com.lastfm.sessions
 
 import com.lastfm.sessions.pipelines.{DataCleaningPipeline, PipelineConfig, UserIdPartitionStrategy, QualityThresholds, SparkConfig}
 import com.lastfm.sessions.orchestration.{PipelineOrchestrator, ProductionConfigManager, SparkSessionManager, PipelineExecutionResult}
-import com.lastfm.sessions.testutil.{BaseTestSpec, TestConfiguration, JavaCompatibilityHelper}
+import com.lastfm.sessions.utils.{BaseTestSpec, TestConfiguration, JavaCompatibilityHelper}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession

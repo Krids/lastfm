@@ -50,35 +50,31 @@ class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPo
   ))
   
   /**
-   * Loads listening events from a TSV file using Spark DataFrame operations.
+   * Loads listening events from a TSV file using memory-efficient Spark DataFrame operations.
    * 
    * This method:
    * 1. Reads TSV file with proper schema
    * 2. Validates and filters malformed records
-   * 3. Converts to domain objects
+   * 3. Converts to domain objects using batch processing
    * 4. Returns validated ListenEvent instances
    * 
    * @param dataSourcePath Path to the TSV file containing listening events
    * @return Try containing either List of ListenEvent objects or failure exception
    */
   override def loadListenEvents(dataSourcePath: String): Try[List[ListenEvent]] = {
-    // Use memory-efficient batch processing implementation for backward compatibility
-    loadListenEventsBatched(dataSourcePath)
+    loadListenEvents(dataSourcePath, maxReturnSize = 5000)
   }
 
   /**
-   * Memory-efficient batch processing implementation of loadListenEvents.
+   * Loads listening events with configurable batch size to avoid memory issues.
    * 
-   * Uses Spark's distributed processing with limited result sets to avoid OutOfMemoryErrors
-   * while maintaining API compatibility for large static TSV files.
-   * 
-   * @param dataSourcePath Path to the static TSV file
+   * @param dataSourcePath Path to the TSV file containing listening events
    * @param maxReturnSize Maximum number of events to return (prevents memory issues)
-   * @return Try containing sampled ListenEvent objects from static file
+   * @return Try containing either List of ListenEvent objects or failure exception
    */
-  def loadListenEventsBatched(
+  def loadListenEvents(
     dataSourcePath: String, 
-    maxReturnSize: Int = 5000
+    maxReturnSize: Int
   ): Try[List[ListenEvent]] = {
     try {
       // Read and validate using distributed operations
@@ -208,10 +204,6 @@ class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPo
     }
   }
 
-  override def loadWithDataQuality(dataSourcePath: String): Try[(List[ListenEvent], DataQualityMetrics)] = {
-    // Use the memory-efficient batch processing implementation for large static files
-    loadWithDataQualityBatched(dataSourcePath)
-  }
 
   /**
    * Memory-efficient implementation for processing large static TSV files.
@@ -421,59 +413,6 @@ class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPo
       lines.size.toLong
     } catch {
       case _: Exception => 0L
-    }
-  }
-
-  /**
-   * Loads cleaned listening events from Silver layer for session analysis.
-   * 
-   * Optimized loading strategy:
-   * - Utilizes Spark's distributed processing for large Silver layer files
-   * - Handles both single files and Spark output directories automatically
-   * - Applies schema validation for data integrity
-   * - Maintains optimal partitioning for downstream session calculation
-   * - Handles unicode and international content correctly
-   */
-  override def loadCleanedEvents(silverPath: String): Try[List[ListenEvent]] = {
-    try {
-      // Determine the correct path for Silver layer data
-      val actualSilverPath = resolveSilverLayerPath(silverPath)
-      
-      // Read cleaned Silver layer TSV files as text and parse manually
-      // Data Cleaning Pipeline outputs proper TSV text files
-      val silverTextDF = spark.read
-        .option("encoding", "UTF-8")
-        .text(actualSilverPath)
-        
-      // Parse TSV text lines into structured data
-      val silverDF = silverTextDF
-        .select(split(col("value"), "\t").as("fields"))
-        .filter(size(col("fields")) === 7) // Ensure correct field count
-        .select(
-          col("fields")(0).as("userId"),
-          col("fields")(1).as("timestamp"), 
-          when(col("fields")(2) === "", null)
-            .otherwise(col("fields")(2)).as("artistId"),
-          col("fields")(3).as("artistName"),
-          when(col("fields")(4) === "", null)
-            .otherwise(col("fields")(4)).as("trackId"),
-          col("fields")(5).as("trackName"),
-          col("fields")(6).as("trackKey")
-        )
-      
-      // Convert to ListenEvent objects
-      val events = silverDF
-        .collect()
-        .map(row => convertRowToListenEvent(row))
-        .filter(_.isSuccess)
-        .map(_.get)
-        .toList
-      
-      Success(events)
-      
-    } catch {
-      case NonFatal(exception) =>
-        Failure(new RuntimeException(s"Failed to load cleaned events from Silver layer: $silverPath", exception))
     }
   }
 

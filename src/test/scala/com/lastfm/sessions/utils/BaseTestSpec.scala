@@ -1,4 +1,4 @@
-package com.lastfm.sessions.testutil
+package com.lastfm.sessions.utils
 
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 import com.lastfm.sessions.config.AppConfiguration

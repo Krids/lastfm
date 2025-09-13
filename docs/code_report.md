@@ -1769,7 +1769,7 @@ ENTRYPOINT ["java", "-jar", "lastfm-session-analyzer-assembly-*.jar"]
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: September 12, 2025*
+*Document Version: 1.0*  
+*Last Updated: September 2025*  
 *Author: Felipe Lana Machado*
 *Purpose: Complete technical reference for LastFM Session Analysis project presentation*

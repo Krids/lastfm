@@ -1,4 +1,4 @@
-package com.lastfm.sessions.testutil
+package com.lastfm.sessions.utils
 
 import com.lastfm.sessions.config.AppConfiguration
 import scala.util.{Try, Success, Failure}

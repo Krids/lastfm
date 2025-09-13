@@ -646,5 +646,5 @@ The solution positions the implementer as a **senior data engineering expert** w
 ---
 
 *Document Version: 1.0*  
-*Last Updated: [Current Date]*  
-*Author: Data Engineering Team*
+*Last Updated: September 2025*  
+*Author: Felipe Lana Machado*

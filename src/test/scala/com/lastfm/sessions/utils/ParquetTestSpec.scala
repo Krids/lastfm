@@ -1,4 +1,4 @@
-package com.lastfm.sessions.testutil
+package com.lastfm.sessions.utils
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

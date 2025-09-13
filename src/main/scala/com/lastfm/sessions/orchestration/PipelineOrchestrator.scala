@@ -60,10 +60,10 @@ object PipelineOrchestrator {
    * and production session in production environments for optimal performance.
    */
   private def createAppropriateSparkSession(): SparkSession = {
-    // Detect test environment using multiple indicators
-    val isTestEnvironment = detectTestEnvironment()
+    // Use consolidated test environment detection
+    import com.lastfm.sessions.common.Constants
     
-    if (isTestEnvironment) {
+    if (Constants.Environment.isTestEnvironment) {
       println("🧪 Using simple test Spark session (Java 24 compatible)")
       createSimpleTestSession()
     } else {
@@ -92,29 +92,6 @@ object PipelineOrchestrator {
       .getOrCreate()
   }
   
-  /**
-   * Detects if current execution is in test environment.
-   */
-  private def detectTestEnvironment(): Boolean = {
-    // Check environment variables
-    val envTest = sys.env.get("ENV").exists(_.toLowerCase.contains("test")) ||
-                  sys.props.get("environment").exists(_.toLowerCase.contains("test"))
-    
-    // Check for test framework in stack trace
-    val stackTest = Thread.currentThread().getStackTrace
-      .exists(frame => 
-        frame.getClassName.contains("scalatest") || 
-        frame.getClassName.contains("junit") ||
-        frame.getClassName.contains("Spec") ||
-        frame.getClassName.contains("Test")
-      )
-    
-    // Check JVM properties set by test frameworks
-    val jvmTest = sys.props.get("sbt.testing").isDefined ||
-                  sys.props.get("java.class.path").exists(_.contains("scalatest"))
-    
-    envTest || stackTest || jvmTest
-  }
 
   /**
    * Executes Data Cleaning Service (Bronze → Silver transformation).

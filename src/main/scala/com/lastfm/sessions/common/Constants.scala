@@ -186,5 +186,45 @@ object Constants {
     /** Maximum session duration in minutes (24 hours) */
     val MAX_SESSION_DURATION_MINUTES = 1440
   }
+
+  /**
+   * Utility methods for runtime environment detection
+   */
+  object Environment {
+    
+    /**
+     * Detects if current execution is in test environment.
+     * 
+     * Uses comprehensive detection combining multiple indicators:
+     * - Environment variables (ENV, SBT_TEST)
+     * - JVM system properties (sbt.testing, java.class.path)
+     * - Stack trace analysis for test frameworks
+     * - SBT main class detection
+     * 
+     * @return true if running in test environment, false otherwise
+     */
+    def isTestEnvironment: Boolean = {
+      // Check environment variables
+      val envTest = sys.env.get("ENV").exists(_.toLowerCase.contains("test")) ||
+                    sys.env.get("SBT_TEST").isDefined ||
+                    sys.props.get("environment").exists(_.toLowerCase.contains("test"))
+      
+      // Check JVM properties set by test frameworks
+      val jvmTest = sys.props.get("sbt.testing").isDefined ||
+                    sys.props.get("java.class.path").exists(_.contains("scalatest")) ||
+                    sys.props.get("sbt.main.class").exists(_.contains("sbt."))
+      
+      // Check for test framework in stack trace
+      val stackTest = Thread.currentThread().getStackTrace
+        .exists(frame => 
+          frame.getClassName.contains("scalatest") || 
+          frame.getClassName.contains("junit") ||
+          frame.getClassName.contains("Spec") ||
+          frame.getClassName.contains("Test")
+        )
+      
+      envTest || jvmTest || stackTest
+    }
+  }
 }
 

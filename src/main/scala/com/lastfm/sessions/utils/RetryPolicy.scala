@@ -140,19 +140,24 @@ object NoRetry extends RetryPolicy {
 object RetryPolicy {
   
   /**
-   * Creates a retry policy from configuration
-   * @param config The application configuration
-   * @return A configured retry policy
+   * Creates a retry policy from configuration constants
+   * @return A configured retry policy using ConfigurableConstants
    */
-  def fromConfig(config: com.lastfm.sessions.config.AppConfiguration): RetryPolicy = {
-    if (config.maxRetryAttempts == 0) {
+  def fromConfig(): RetryPolicy = {
+    import com.lastfm.sessions.common.ConfigurableConstants
+    
+    val maxAttempts = ConfigurableConstants.Performance.RETRY_MAX_ATTEMPTS.value
+    if (maxAttempts == 0) {
       NoRetry
     } else {
+      val initialDelayMs = ConfigurableConstants.Performance.RETRY_INITIAL_DELAY_MS
+      val backoffMultiplier = ConfigurableConstants.Performance.RETRY_BACKOFF_MULTIPLIER.value
+      
       new ExponentialBackoffRetry(
-        maxAttempts = config.maxRetryAttempts,
-        initialDelay = config.retryDelayMs.milliseconds,
-        backoffMultiplier = config.retryBackoffMultiplier,
-        maxDelay = (config.retryDelayMs * Math.pow(config.retryBackoffMultiplier, config.maxRetryAttempts - 1)).toLong.milliseconds
+        maxAttempts = maxAttempts,
+        initialDelay = initialDelayMs.milliseconds,
+        backoffMultiplier = backoffMultiplier,
+        maxDelay = (initialDelayMs * Math.pow(backoffMultiplier, maxAttempts - 1)).toLong.milliseconds
       )
     }
   }

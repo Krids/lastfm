@@ -40,18 +40,6 @@ object DataCleaningServiceFactory {
   }
   
   /**
-   * Creates test-friendly data cleaning service.
-   * 
-   * Uses simplified configuration suitable for unit and integration testing.
-   * 
-   * @param spark Test Spark session
-   * @return DataCleaningService configured for testing
-   */
-  def createTestService(implicit spark: SparkSession): DataCleaningService = {
-    new DataCleaningService()(spark)
-  }
-  
-  /**
    * Optimizes Spark configuration for data cleaning workloads.
    * 
    * Applies performance optimizations specific to data cleaning:

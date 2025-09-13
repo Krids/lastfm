@@ -2,7 +2,7 @@ package com.lastfm.sessions.config
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import com.lastfm.sessions.testutil.{BaseTestSpec, TestConfiguration}
+import com.lastfm.sessions.utils.{BaseTestSpec, TestConfiguration}
 import scala.util.{Try, Success, Failure}
 
 /**

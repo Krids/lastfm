@@ -1,7 +1,7 @@
 package com.lastfm.sessions.pipelines
 
 import com.lastfm.sessions.domain.DataQualityMetrics
-import com.lastfm.sessions.testutil.{ParquetTestSpec, BaseTestSpec}
+import com.lastfm.sessions.utils.{ParquetTestSpec, BaseTestSpec}
 import scala.util.{Success, Failure, Try}
 
 /**

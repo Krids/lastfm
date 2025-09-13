@@ -1,7 +1,7 @@
 package com.lastfm.sessions.pipelines
 
 import com.lastfm.sessions.domain.DataQualityMetrics
-import com.lastfm.sessions.testutil.BaseTestSpec
+import com.lastfm.sessions.utils.BaseTestSpec
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession
