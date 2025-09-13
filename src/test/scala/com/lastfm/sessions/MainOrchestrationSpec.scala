@@ -2,6 +2,7 @@ package com.lastfm.sessions
 
 import com.lastfm.sessions.pipelines.{DataCleaningPipeline, PipelineConfig, UserIdPartitionStrategy, QualityThresholds, SparkConfig}
 import com.lastfm.sessions.orchestration.{PipelineOrchestrator, ProductionConfigManager, SparkSessionManager, PipelineExecutionResult}
+import com.lastfm.sessions.testutil.TestEnvironment
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.BeforeAndAfterEach
@@ -31,17 +32,16 @@ import scala.util.{Try, Success}
  * @author Felipe Lana Machado
  * @since 1.0.0
  */
-class MainOrchestrationSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach {
+class MainOrchestrationSpec extends AnyFlatSpec with Matchers with TestEnvironment {
 
-  // Test directories for orchestration testing
-  val testBaseDir = "/tmp/orchestration-test"
-  val bronzeDir = s"$testBaseDir/bronze"
-  val silverDir = s"$testBaseDir/silver" 
-  val goldDir = s"$testBaseDir/gold"
+  // Use test directories from TestEnvironment trait
+  val bronzeDir = testBronzeDir
+  val silverDir = testSilverDir
+  val goldDir = testGoldDir
   
+  // Override afterEach to ensure proper cleanup (TestEnvironment handles cleanup)
   override def afterEach(): Unit = {
-    cleanupSessionAnalysisTestArtifacts()
-    super.afterEach()
+    super.afterEach() // This calls TestEnvironment's cleanup
   }
 
   /**
@@ -60,22 +60,32 @@ class MainOrchestrationSpec extends AnyFlatSpec with Matchers with BeforeAndAfte
   
   it should "execute session-analysis pipeline when specified" in {
     // Arrange
-    val args = Array("session-analysis")
     val testInputPath = createTestDataForOrchestration()
+    val config = createTestConfig(testInputPath)
     
-    // Act & Assert - Should execute SessionAnalysisPipeline (when implemented)
-    val result = PipelineOrchestrator.parseArgsAndExecute(args, createTestConfig(testInputPath))
+    // Session analysis needs cleaned data in Silver layer, so run data-cleaning first
+    PipelineOrchestrator.parseArgsAndExecute(Array("data-cleaning"), config)
+    
+    // Now test session-analysis
+    val args = Array("session-analysis")
+    val result = PipelineOrchestrator.parseArgsAndExecute(args, config)
     
     result should be(PipelineExecutionResult.SessionAnalysisCompleted)
   }
   
   it should "execute ranking pipeline when specified" in {
     // Arrange
-    val args = Array("ranking")
     val testInputPath = createTestDataForOrchestration()
+    val config = createTestConfig(testInputPath)
     
-    // Act & Assert - Should execute RankingPipeline (when implemented)
-    val result = PipelineOrchestrator.parseArgsAndExecute(args, createTestConfig(testInputPath))
+    // First run data cleaning and session analysis to create prerequisite data
+    // Ranking pipeline depends on sessions existing in the Silver layer
+    PipelineOrchestrator.parseArgsAndExecute(Array("data-cleaning"), config)
+    PipelineOrchestrator.parseArgsAndExecute(Array("session-analysis"), config)
+    
+    // Now test the ranking pipeline
+    val args = Array("ranking")
+    val result = PipelineOrchestrator.parseArgsAndExecute(args, config)
     
     result should be(PipelineExecutionResult.RankingCompleted)
   }
@@ -192,49 +202,17 @@ class MainOrchestrationSpec extends AnyFlatSpec with Matchers with BeforeAndAfte
   /**
    * Helper methods for orchestration testing.
    */
-  /**
-   * Cleans up session analysis test artifacts that are created in the actual Silver layer.
-   */
-  private def cleanupSessionAnalysisTestArtifacts(): Unit = {
-    Try {
-      val silverSessionsPath = Paths.get("data/output/silver/sessions.parquet")
-      if (Files.exists(silverSessionsPath)) {
-        println(s"🧹 Cleaning up session analysis test artifacts: $silverSessionsPath")
-        Files.walk(silverSessionsPath)
-          .sorted(java.util.Comparator.reverseOrder())
-          .forEach(Files.deleteIfExists)
-        println("✅ Session analysis test artifacts cleaned")
-      }
-    }.recover {
-      case ex: Exception =>
-        println(s"⚠️  Could not clean session analysis artifacts: ${ex.getMessage}")
-        // Don't fail tests due to cleanup issues
-    }
-  }
 
   private def createTestDataForOrchestration(): String = {
-    Files.createDirectories(Paths.get(bronzeDir))
-    
-    val testFile = s"$bronzeDir/orchestration-test.tsv"
-    val content = List(
-      ("user_000001", "2009-05-04T23:08:57Z", "artist-1", "Test Artist", "track-1", "Test Track")
-    ).map { case (userId, timestamp, artistId, artistName, trackId, trackName) =>
-      s"$userId\t$timestamp\t$artistId\t$artistName\t$trackId\t$trackName"
-    }.mkString("\n")
-    
-    Files.write(Paths.get(testFile), content.getBytes(StandardCharsets.UTF_8))
-    testFile
+    // Use TestEnvironment's createTestData method
+    createTestData("orchestration-test.tsv")
   }
   
   private def createTestConfig(bronzePath: String): PipelineConfig = {
-    Files.createDirectories(Paths.get(silverDir))
-    
-    PipelineConfig(
+    // Use TestEnvironment's createTestPipelineConfig with custom paths
+    createTestPipelineConfig(
       bronzePath = bronzePath,
-      silverPath = s"$silverDir/orchestration-output", // Parquet directory, not .tsv file
-      partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
-      qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
-      sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")
+      silverPath = s"$silverDir/orchestration-output.parquet"
     )
   }
 }

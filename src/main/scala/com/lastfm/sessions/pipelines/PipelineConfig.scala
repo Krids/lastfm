@@ -4,7 +4,7 @@ package com.lastfm.sessions.pipelines
  * Production pipeline configuration following enterprise data engineering best practices.
  * 
  * Encapsulates all configuration parameters for medallion architecture pipelines:
- * - Data paths following Bronze/Silver/Gold layer separation
+ * - Data paths following Bronze/Silver/Gold/Results layer separation
  * - Environment-aware partitioning strategies for optimal performance  
  * - Quality thresholds aligned with business requirements
  * - Spark configuration optimized for distributed processing
@@ -16,7 +16,9 @@ package com.lastfm.sessions.pipelines
  * - Quality assurance with business-defined thresholds
  * 
  * @param bronzePath Path to raw input data (Bronze layer)
- * @param silverPath Path to quality-validated output data (Silver layer)  
+ * @param silverPath Path to quality-validated output data (Silver layer)
+ * @param goldPath Path to analyzed data (Gold layer)
+ * @param outputPath Path to final results (Results layer - top_songs.tsv)
  * @param partitionStrategy Strategy for data partitioning optimization
  * @param qualityThresholds Business-defined quality requirements
  * @param sparkConfig Spark-specific performance configuration
@@ -27,6 +29,8 @@ package com.lastfm.sessions.pipelines
 case class PipelineConfig(
   bronzePath: String,
   silverPath: String,
+  goldPath: String = "data/output/gold",
+  outputPath: String = "data/output/results",
   partitionStrategy: PartitionStrategy,
   qualityThresholds: QualityThresholds,
   sparkConfig: SparkConfig
@@ -34,6 +38,8 @@ case class PipelineConfig(
   // Configuration validation at construction time
   require(bronzePath != null && bronzePath.nonEmpty, "bronzePath cannot be null or empty")
   require(silverPath != null && silverPath.nonEmpty, "silverPath cannot be null or empty")
+  require(goldPath != null && goldPath.nonEmpty, "goldPath cannot be null or empty")
+  require(outputPath != null && outputPath.nonEmpty, "outputPath cannot be null or empty")
   require(partitionStrategy != null, "partitionStrategy cannot be null")
   require(qualityThresholds != null, "qualityThresholds cannot be null")
   require(sparkConfig != null, "sparkConfig cannot be null")

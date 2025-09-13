@@ -110,12 +110,15 @@ object ProductionConfigManager {
    * - Silver layer: Quality-validated clean data artifacts
    * - Gold layer: Business logic results and session analysis
    * - Results layer: Final output files
+   * 
+   * Note: Specific Gold layer subdirectories are created by individual pipelines
+   * to maintain proper separation of concerns.
    */
   def createProductionDirectories(): Unit = {
     val directoriesToCreate = List(
       "data/output/bronze",   // Raw data staging (optional)
       "data/output/silver",   // Quality-validated artifacts
-      "data/output/gold",     // Session analysis results  
+      "data/output/gold",     // Session analysis results
       "data/output/results"   // Final output (top_songs.tsv)
     )
     

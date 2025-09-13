@@ -23,12 +23,13 @@ data/output/gold/*.parquet
 data/output/gold/*.json         # Generated session metrics
 data/output/gold/*_spark_output/    # Spark output directories
 data/output/gold/listening-events-cleaned-session-analytics
-
-# Results Layer (Final Pipeline Output) - Exclude generated artifacts, keep structure
-data/output/results/*.parquet
-data/output/results/*.tsv       # Generated final results (top_songs.tsv)
-data/output/results/*.json      # Generated pipeline summary
-data/output/results/*.parquet
+data/output/gold/listening-events-cleaned-session-analytics/*
+data/output/gold/listening-events-cleaned-session-analytics/*.parquet
+data/output/gold/ranking-results/
+data/output/gold/ranking-results/*.parquet
+data/output/gold/ranking-results/*.tsv
+data/output/gold/ranking-results/*.json
+data/output/gold/ranking-results/*_spark_output/
 
 # Catch-all for data output artifacts
 data/output/**/*.tsv
@@ -278,3 +279,8 @@ data/lastfm-dataset-1K.tar.gz
 data/*.tar.gz
 data/lastfm/lastfm-dataset-1k/userid-timestamp-artid-artname-traid-traname.tsv
 data/lastfm/lastfm-dataset-1k/userid-profile.tsv
+
+# Test artifacts directory
+data/test/
+/tmp/orchestration-test/
+/tmp/parquet-test/

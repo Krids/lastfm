@@ -239,9 +239,14 @@ class DataCleaningPipeline(val config: PipelineConfig)(implicit spark: SparkSess
   /**
    * Generates JSON report for data cleaning pipeline.
    * Follows the same pattern as session analysis pipeline for consistency.
+   * 
+   * Reports are written alongside (not inside) the Parquet directory to avoid
+   * conflicts when reading Parquet data.
    */
   private def generateDataCleaningJSON(metrics: DataQualityMetrics, silverPath: String): Unit = {
-    val reportPath = s"${silverPath.replace(".parquet", "")}/data-cleaning-report.json"
+    // Write report alongside the Parquet directory, not inside it
+    val basePath = silverPath.replace(".parquet", "")
+    val reportPath = s"${basePath}-report.json"
     val reportContent = generateDataCleaningReportJSON(metrics)
     
     // Ensure output directory exists
