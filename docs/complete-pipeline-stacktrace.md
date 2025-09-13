@@ -52,10 +52,10 @@ This document provides a complete stacktrace/call tree showing every file, class
     │   │   └─────────────────────────────────────────────────────────────────┘
     │   ├── 🧹 executeDataCleaningPipeline(config)
     │   │   ├── using(createAppropriateSparkSession()) { implicit spark =>
-    │   │   │   ├── detectTestEnvironment() → Boolean
-    │   │   │   │   ├── sys.env.get("ENV") → Environment variable check
+    │   │   │   ├── Constants.Environment.isTestEnvironment → Boolean
+    │   │   │   │   ├── sys.env.get("ENV") + sys.env.get("SBT_TEST") → Environment variables
     │   │   │   │   ├── Thread.currentThread().getStackTrace → Stack analysis
-    │   │   │   │   └── sys.props.get("sbt.testing") → JVM properties check
+    │   │   │   │   └── sys.props.get("sbt.testing") + java.class.path → JVM properties
     │   │   │   ├── IF (isTestEnvironment)
     │   │   │   │   └── createSimpleTestSession() → SparkSession.builder()
     │   │   │   │       ├── .appName("LastFM-Test-Pipeline")
@@ -401,7 +401,7 @@ DataCleaningService.scala
 
 DataCleaningServiceFactory.scala
 ├── Production service creation
-└── Test service creation
+└── Spark optimization for data cleaning workloads
 ```
 
 ### **🔄 Pipeline Implementations (3 files)**
