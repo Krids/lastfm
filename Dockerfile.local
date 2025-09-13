@@ -28,9 +28,20 @@ COPY src/ src/
 RUN sbt compile test:compile
 
 # =============================================================================
-# Runtime Stage: Minimal JRE with compiled application
+# Runtime Stage: JRE with SBT for application execution
 # =============================================================================
-FROM openjdk:11-jre-slim AS runtime
+FROM openjdk:11-jdk-slim AS runtime
+
+# Install SBT and essential tools for runtime
+RUN apt-get update && \
+    apt-get install -y curl bc procps && \
+    # Install SBT (same version as builder)
+    curl -L -o sbt.deb "https://repo.scala-sbt.org/scalasbt/debian/sbt-1.9.7.deb" && \
+    dpkg -i sbt.deb || apt-get install -f -y && \
+    rm sbt.deb && \
+    # Clean up to reduce image size
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
 RUN groupadd -r lastfm && useradd -r -g lastfm -d /app -s /bin/bash lastfm

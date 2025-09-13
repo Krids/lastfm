@@ -6,9 +6,9 @@ name: "LastFM Data Engineering - Internal CI/CD Pipeline"
 
 on:
   push:
-    branches: [main, develop, 'feature/*', 'code_optimization']
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
   workflow_dispatch:
     inputs:
       run_performance_tests:
@@ -310,7 +310,7 @@ jobs:
     name: "Performance Benchmarking"
     needs: [comprehensive-testing]
     runs-on: ubuntu-latest
-    if: github.event.inputs.run_performance_tests == 'true' || github.ref == 'refs/heads/main' || contains(github.ref, 'code_optimization')
+    if: github.event.inputs.run_performance_tests == 'true' || github.ref == 'refs/heads/main'
     
     steps:
       - name: "Checkout Repository"
@@ -513,7 +513,7 @@ jobs:
     name: "Deployment Readiness Assessment"
     needs: [data-quality-validation, container-build-and-validation]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || contains(github.ref, 'code_optimization')
+    if: github.ref == 'refs/heads/main'
     
     steps:
       - name: "Checkout Repository"
