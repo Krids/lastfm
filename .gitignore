@@ -181,13 +181,6 @@ config/local/
 application-local.conf
 
 # ===========================
-# Docker
-# ===========================
-.dockerignore
-docker-compose.override.yml
-docker-compose.local.yml
-
-# ===========================
 # Infrastructure as Code
 # ===========================
 # Terraform
