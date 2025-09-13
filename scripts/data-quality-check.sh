@@ -118,7 +118,7 @@ if [ -f "data/sample/lastfm-sample-data.tsv" ]; then
     print_status "Sample data file found: $SAMPLE_FILE"
     
     # Basic statistics
-    SAMPLE_LINES=$(wc -l < "$SAMPLE_FILE")
+    SAMPLE_LINES=$(($(wc -l < "$SAMPLE_FILE")))
     print_status "Sample data lines: $SAMPLE_LINES"
     
     # Check data structure
@@ -137,7 +137,7 @@ if [ -f "data/sample/lastfm-sample-data.tsv" ]; then
     done
     
     # Check for empty lines or common data issues
-    EMPTY_LINES=$(grep -c '^$' "$SAMPLE_FILE" 2>/dev/null || echo "0")
+    EMPTY_LINES=$(($(grep -c '^$' "$SAMPLE_FILE" 2>/dev/null || echo "0")))
     if [ "$EMPTY_LINES" -gt 0 ]; then
         print_warning "Empty lines detected: $EMPTY_LINES"
     else
@@ -184,8 +184,8 @@ cat > "$QUALITY_REPORT" << EOF
       "config_sections_validated": 3
     },
     "data_structure": {
-      "sample_lines": ${SAMPLE_LINES:-0},
-      "empty_lines": ${EMPTY_LINES:-0},
+      "sample_lines": $((${SAMPLE_LINES:-0})),
+      "empty_lines": $((${EMPTY_LINES:-0})),
       "format_validation": "passed"
     }
   },
