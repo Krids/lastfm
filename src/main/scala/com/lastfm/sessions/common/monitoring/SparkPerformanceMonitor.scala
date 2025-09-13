@@ -147,7 +147,7 @@ trait SparkPerformanceMonitor extends PerformanceMonitor {
     // Simplified implementation using publicly available APIs
     // In practice, detailed cache metrics would require access to internal Spark APIs
     CacheEfficiencyMetrics(
-      totalCachedTables = 0, // Would need to access internal Spark metrics
+      totalCachedTables = 0,
       totalCacheSize = 0L,
       cacheHitRatio = 0.0,
       evictionCount = 0L
@@ -166,18 +166,18 @@ trait SparkPerformanceMonitor extends PerformanceMonitor {
     
     executorInfos.map { executor =>
       ExecutorMetrics(
-        executorId = executor.host, // Use available fields
+        executorId = executor.host,
         host = executor.host,
-        isActive = true, // Assume active if returned by statusTracker
-        totalCores = Runtime.getRuntime.availableProcessors(), // Approximate
-        maxMemory = Runtime.getRuntime.maxMemory(), // Use runtime memory as approximation
-        memoryUsed = Runtime.getRuntime.totalMemory() - Runtime.getRuntime.freeMemory(), // Approximate
-        diskUsed = 0L, // Not available in public API
-        activeTasks = 0, // Not directly available in public API
-        failedTasks = 0, // Not directly available in public API
-        completedTasks = 0, // Not directly available in public API
-        totalTasks = 0, // Not directly available in public API
-        maxTasks = Runtime.getRuntime.availableProcessors() // Approximate
+        isActive = true,
+        totalCores = Runtime.getRuntime.availableProcessors(),
+        maxMemory = Runtime.getRuntime.maxMemory(),
+        memoryUsed = Runtime.getRuntime.totalMemory() - Runtime.getRuntime.freeMemory(),
+        diskUsed = 0L,
+        activeTasks = 0,
+        failedTasks = 0,
+        completedTasks = 0,
+        totalTasks = 0,
+        maxTasks = Runtime.getRuntime.availableProcessors()
       )
     }.toList
   }

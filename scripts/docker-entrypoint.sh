@@ -62,6 +62,6 @@ case "$PIPELINE" in
         echo "  - Top Tracks: ${TOP_TRACKS:-10}"
         
         # CRITICAL: Proper SBT command quoting for runMain with environment settings
-        exec sbt $SBT_OPTS -mem $MEMORY_MB "runMain com.lastfm.sessions.Main $PIPELINE"
+        exec sbt -Djava.io.tmpdir=/app/tmp $SBT_OPTS -mem $MEMORY_MB "runMain com.lastfm.sessions.Main $PIPELINE"
         ;;
 esac

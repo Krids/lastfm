@@ -3,6 +3,7 @@ package com.lastfm.sessions.orchestration
 import org.apache.spark.sql.SparkSession
 import com.lastfm.sessions.common.{Constants, ConfigurableConstants}
 import com.lastfm.sessions.common.traits.{SparkConfigurable, MetricsCalculator}
+import com.lastfm.sessions.config.AppConfiguration
 import scala.util.Try
 
 /**
@@ -32,6 +33,7 @@ object SparkSessionManager extends SparkConfigurable with MetricsCalculator {
    * @return SparkSession configured for production Last.fm processing
    */
   def createProductionSession(): SparkSession = {
+    val config = AppConfiguration.default()
     val cores = Runtime.getRuntime.availableProcessors()
     val optimalPartitions = ConfigurableConstants.Partitioning.DEFAULT_PARTITIONS.value
     val heapSizeGB = (Runtime.getRuntime.maxMemory() / 1024 / 1024 / 1024).toInt
@@ -41,8 +43,8 @@ object SparkSessionManager extends SparkConfigurable with MetricsCalculator {
     
     // Apply production configuration using trait
     configureForProduction(builder)
-      .config("spark.driver.memory", s"${Math.min(heapSizeGB - 2, 16)}g")
-      .config("spark.executor.memory", "4g")
+      .config("spark.driver.memory", config.sparkDriverMemory)
+      .config("spark.executor.memory", config.sparkExecutorMemory)
       .config("spark.driver.maxResultSize", "8g")
       .config("spark.local.dir", System.getProperty("java.io.tmpdir"))
       .config("spark.driver.extraJavaOptions", getOptimalJVMOptions(heapSizeGB))

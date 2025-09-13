@@ -27,7 +27,7 @@ import scala.util.control.NonFatal
  * - Comprehensive error handling and recovery
  * 
  * @param spark Implicit SparkSession for data processing operations
- * @author LastFM Session Analysis Team
+ * @author Felipe Lana Machado
  * @since 1.0.0
  */
 class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPort {

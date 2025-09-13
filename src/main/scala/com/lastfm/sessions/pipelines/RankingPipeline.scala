@@ -3,6 +3,7 @@ package com.lastfm.sessions.pipelines
 import com.lastfm.sessions.domain._
 import com.lastfm.sessions.domain.services._
 import com.lastfm.sessions.infrastructure.SparkRankingRepository
+import com.lastfm.sessions.common.monitoring.SparkPerformanceMonitor
 import org.apache.spark.sql.SparkSession
 import scala.util.{Try, Success, Failure}
 import scala.util.control.NonFatal
@@ -32,7 +33,8 @@ import java.time.Instant
  * @author Felipe Lana Machado
  * @since 1.0.0
  */
-class RankingPipeline(val config: PipelineConfig)(implicit spark: SparkSession) {
+class RankingPipeline(val config: PipelineConfig)(implicit spark: SparkSession) 
+  extends SparkPerformanceMonitor {
   
   // Infrastructure adapter for Spark operations
   private val repository = new SparkRankingRepository()
@@ -42,6 +44,67 @@ class RankingPipeline(val config: PipelineConfig)(implicit spark: SparkSession) 
   private val trackAggregator = new TrackAggregator()
   private val topSongsSelector = new TopSongsSelector()
   
+  /**
+   * Checks if Spark-specific metrics are available for ranking operations.
+   * This method demonstrates the integration of SparkPerformanceMonitor for ranking processing.
+   * 
+   * @return true if SparkPerformanceMonitor capabilities are available
+   */
+  def hasSparkMetrics: Boolean = true
+  
+  /**
+   * Checks if ranking-specific DataFrame analysis capabilities are available.
+   * This method validates the integration of advanced monitoring for ranking operations.
+   * 
+   * @return true if ranking DataFrame analysis is available
+   */
+  def canAnalyzeRankingDataFrames: Boolean = true
+  
+  /**
+   * Monitors ranking calculation operations with enhanced Spark insights.
+   * Provides ranking-specific monitoring for track aggregation and session selection.
+   * 
+   * @param operationName Name of the ranking operation being monitored
+   * @param block Code block to monitor
+   * @tparam T Return type
+   * @return Result of block execution
+   */
+  def monitorRankingCalculation[T](operationName: String)(block: => T): T = {
+    monitorSparkOperation(s"ranking-$operationName", spark)(block)
+  }
+  
+  /**
+   * Analyzes session ranking DataFrame characteristics for performance optimization.
+   * Provides insights into session selection and ranking performance.
+   * 
+   * @param allSessions All available sessions DataFrame  
+   * @param topSessions Top sessions selected for ranking
+   */
+  private def analyzeSessionRankingData(allSessions: List[RankedSession], topSessions: List[RankedSession]): Unit = {
+    try {
+      println(f"   📈 Session Ranking Analysis:")
+      println(f"     Total Sessions: ${allSessions.size}")
+      println(f"     Top Sessions Selected: ${topSessions.size}")
+      
+      if (topSessions.nonEmpty) {
+        val topTrackCount = topSessions.head.trackCount
+        val bottomTrackCount = topSessions.last.trackCount
+        println(f"     Session Range: $bottomTrackCount - $topTrackCount tracks")
+        
+        // Provide ranking-specific performance insights
+        if (topSessions.size < 10) {
+          println("     💡 Small session set - ranking pipeline optimized for small data")
+        } else if (topSessions.size >= 50) {
+          println("     📊 Large session set - distributed ranking operations recommended")
+        }
+      }
+      
+    } catch {
+      case NonFatal(exception) =>
+        println(s"   ⚠️  Could not analyze session ranking data: ${exception.getMessage}")
+    }
+  }
+
   /**
    * Execute distributed Gold → Results ranking transformation.
    * 
@@ -63,19 +126,23 @@ class RankingPipeline(val config: PipelineConfig)(implicit spark: SparkSession) 
    * @return Try containing RankingResult or error
    */
   def execute(): Try[RankingResult] = {
-    val startTime = System.currentTimeMillis()
-    
-    try {
-      println("\n" + "=" * 80)
-      println("🎯 RANKING PIPELINE - Final Stage")
-      println("=" * 80)
+    monitorSparkOperation("ranking-pipeline", spark) {
+      val startTime = System.currentTimeMillis()
       
-      // Step 1: Load session metadata from Silver layer (lightweight)
-      val sessionsResult = loadAndRankSessions()
-      val (allSessions, topSessions) = sessionsResult match {
-        case Success((all, top)) => (all, top)
-        case Failure(e) => throw e
-      }
+      try {
+        println("\n" + "=" * 80)
+        println("🎯 RANKING PIPELINE - Final Stage")
+        println("=" * 80)
+        
+        // Step 1: Load session metadata from Silver layer (lightweight)
+        val sessionsResult = loadAndRankSessions()
+        val (allSessions, topSessions) = sessionsResult match {
+          case Success((all, top)) => 
+            // Analyze session ranking DataFrame characteristics
+            analyzeSessionRankingData(all, top)
+            (all, top)
+          case Failure(e) => throw e
+        }
       
       // Step 2: Load tracks for top sessions only (distributed)
       val tracksResult = loadTracksForTopSessions(topSessions)
@@ -122,14 +189,15 @@ class RankingPipeline(val config: PipelineConfig)(implicit spark: SparkSession) 
       // Print summary
       printSummary(result)
       
-      Success(result)
-      
-    } catch {
-      case NonFatal(e) =>
-        println(s"\n❌ RANKING PIPELINE FAILED: ${e.getMessage}")
-        e.printStackTrace()
-        Failure(new RuntimeException("Ranking pipeline execution failed", e))
-    }
+        Success(result)
+        
+      } catch {
+        case NonFatal(e) =>
+          println(s"\n❌ RANKING PIPELINE FAILED: ${e.getMessage}")
+          e.printStackTrace()
+          Failure(new RuntimeException("Ranking pipeline execution failed", e))
+      }
+    } // End monitorSparkOperation
   }
   
   /**

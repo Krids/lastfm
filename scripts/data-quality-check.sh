@@ -306,8 +306,7 @@ print_success "Pipeline data flow validation completed"
 # Data Quality Test 8: Business Rules Validation
 print_status "🎯 Business Rules Validation..."
 
-print_status "Validating session boundary detection..."
-sbt "testOnly *SessionBoundaryDetectorSpec" 2>&1 | tee logs/session-boundary-validation.log || print_warning "Session boundary validation completed"
+# Session boundary detection is now handled by Spark window functions in SparkDistributedSessionAnalysisRepository
 
 print_status "Validating track aggregation logic..."
 sbt "testOnly *TrackAggregatorSpec" 2>&1 | tee logs/track-aggregator-validation.log || print_warning "Track aggregator validation completed"

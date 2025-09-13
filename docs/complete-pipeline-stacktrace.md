@@ -477,10 +477,9 @@ ValidationResult.scala
 ├── Valid/Invalid pattern matching
 └── Error message aggregation
 
-SessionBoundaryDetector.scala
-├── 20-minute gap algorithm
-├── Session boundary identification
-└── Chronological session grouping
+# SessionBoundaryDetector.scala - REMOVED (unused)
+# Session boundary detection now handled by Spark window functions
+# in SparkDistributedSessionAnalysisRepository.scala
 
 LastFmDataValidation.scala
 ├── LastFM-specific validation rules

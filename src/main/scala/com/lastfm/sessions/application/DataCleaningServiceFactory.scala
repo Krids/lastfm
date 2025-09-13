@@ -52,7 +52,7 @@ object DataCleaningServiceFactory {
    */
   private def optimizeSparkForDataCleaning(spark: SparkSession): Unit = {
     val cores = Runtime.getRuntime.availableProcessors()
-    val optimalShufflePartitions = Math.max(16, cores * 2) // Less aggressive than session analysis
+    val optimalShufflePartitions = Math.max(16, cores * 2)
     
     // Adaptive query execution for varying data quality operations
     spark.conf.set("spark.sql.adaptive.enabled", "true")
@@ -73,8 +73,8 @@ object DataCleaningServiceFactory {
     spark.conf.set("spark.sql.optimizer.joinReorderEnabled", "true")
     
     // Data cleaning specific optimizations
-    spark.conf.set("spark.sql.execution.arrow.pyspark.enabled", "false") // Scala optimization
-    spark.conf.set("spark.sql.broadcastTimeout", "36000") // Extended timeout for data validation
+    spark.conf.set("spark.sql.execution.arrow.pyspark.enabled", "false")
+    spark.conf.set("spark.sql.broadcastTimeout", "36000")
     
     // String processing optimizations for data cleaning
     spark.conf.set("spark.sql.optimizer.inSetConversionThreshold", "10")

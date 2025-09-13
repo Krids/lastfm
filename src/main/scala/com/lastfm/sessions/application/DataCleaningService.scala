@@ -19,13 +19,11 @@ import scala.util.control.NonFatal
  * - Apply optimal data processing strategies (validation, partitioning)
  * - Coordinate pipeline operations in correct sequence
  * - Handle cross-cutting concerns (validation, error handling)
- * - Provide clean API for orchestration integration
  * 
  * Design Principles:
  * - Dependency Inversion: Depends on Spark session abstraction
  * - Single Responsibility: Only workflow orchestration, no business logic
  * - Open/Closed: Extensible through configuration
- * - Interface Segregation: Clean, focused public API
  * - Clean Error Handling: Comprehensive failure modes with context
  * 
  * @param spark Spark session for distributed processing

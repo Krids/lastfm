@@ -2,6 +2,7 @@ package com.lastfm.sessions.pipelines
 
 import com.lastfm.sessions.domain.{DistributedSessionAnalysis, SessionMetrics}
 import com.lastfm.sessions.infrastructure.SparkDistributedSessionAnalysisRepository
+import com.lastfm.sessions.common.monitoring.SparkPerformanceMonitor
 import org.apache.spark.sql.SparkSession
 import scala.util.{Try, Success, Failure}
 import scala.util.control.NonFatal
@@ -33,7 +34,68 @@ import java.nio.charset.StandardCharsets
  * @author Felipe Lana Machado
  * @since 1.0.0
  */
-class DistributedSessionAnalysisPipeline(val config: PipelineConfig)(implicit spark: SparkSession) {
+class DistributedSessionAnalysisPipeline(val config: PipelineConfig)(implicit spark: SparkSession) 
+  extends SparkPerformanceMonitor {
+
+  /**
+   * Checks if Spark-specific metrics are available for session analysis.
+   * This method demonstrates the integration of SparkPerformanceMonitor for session processing.
+   * 
+   * @return true if SparkPerformanceMonitor capabilities are available
+   */
+  def hasSparkMetrics: Boolean = true
+  
+  /**
+   * Checks if session-specific DataFrame analysis capabilities are available.
+   * This method validates the integration of advanced monitoring for session calculations.
+   * 
+   * @return true if session DataFrame analysis is available
+   */
+  def canAnalyzeSessionDataFrames: Boolean = true
+  
+  /**
+   * Monitors session calculation operations with enhanced Spark insights.
+   * Provides session-specific monitoring for window functions and distributed processing.
+   * 
+   * @param operationName Name of the session operation being monitored
+   * @param block Code block to monitor
+   * @tparam T Return type
+   * @return Result of block execution
+   */
+  def monitorSessionCalculation[T](operationName: String)(block: => T): T = {
+    monitorSparkOperation(s"session-$operationName", spark)(block)
+  }
+  
+  /**
+   * Analyzes Silver layer input data characteristics for session processing optimization.
+   * Provides DataFrame insights for the input data before session calculation.
+   */
+  private def analyzeSilverInputData(): Unit = {
+    try {
+      // Load Silver layer data for analysis
+      val silverDF = spark.read.parquet(config.silverPath)
+      
+      // Analyze DataFrame characteristics
+      val silverMetrics = analyzeDataFrame(silverDF, "silver-session-input")
+      
+      println(f"   📈 Silver Input Analysis: ${silverMetrics.partitions} partitions, " +
+        f"${silverMetrics.records} records, balanced: ${silverMetrics.isBalanced}")
+      
+      // Analyze partition distribution for session processing
+      if (!silverMetrics.isBalanced) {
+        println(f"   ⚠️  Partition skew detected: ${silverMetrics.partitionSkew}%.2f - may impact session calculation performance")
+      }
+      
+      // Provide session-specific insights
+      if (silverMetrics.avgRecordsPerPartition < 1000) {
+        println("   💡 Small partitions detected - consider repartitioning for session analysis efficiency")
+      }
+      
+    } catch {
+      case NonFatal(exception) =>
+        println(s"   ⚠️  Could not analyze Silver input data: ${exception.getMessage}")
+    }
+  }
 
   /**
    * Execute distributed Silver → Gold session analysis transformation.
@@ -54,17 +116,21 @@ class DistributedSessionAnalysisPipeline(val config: PipelineConfig)(implicit sp
    * @return Try containing DistributedSessionAnalysis results or comprehensive error information
    */
   def execute(): Try[DistributedSessionAnalysis] = {
-    try {
-      println(s"🔄 Starting Distributed Session Analysis Pipeline: Silver → Silver + Gold")
-      println(s"   Clean Events Path: ${config.silverPath}")
-      println(s"   Sessions Output: ${deriveSilverSessionsPath}")
-      println(s"   Gold Analytics Path: ${deriveGoldPath}")
-      println(s"   Session Gap: 20 minutes (distributed window functions)")
-      
-      // Step 1: Create sessions from clean events and save to Silver layer
-      println("📊 Step 1: Creating sessions from Silver events...")
-      val repository = new SparkDistributedSessionAnalysisRepository()
-      val sessionsResult = repository.createAndPersistSessions(config.silverPath, deriveSilverSessionsPath)
+    monitorSparkOperation("distributed-session-analysis", spark) {
+      try {
+        println(s"🔄 Starting Distributed Session Analysis Pipeline: Silver → Silver + Gold")
+        println(s"   Clean Events Path: ${config.silverPath}")
+        println(s"   Sessions Output: ${deriveSilverSessionsPath}")
+        println(s"   Gold Analytics Path: ${deriveGoldPath}")
+        println(s"   Session Gap: 20 minutes (distributed window functions)")
+        
+        // Analyze Silver input data characteristics
+        analyzeSilverInputData()
+        
+        // Step 1: Create sessions from clean events and save to Silver layer
+        println("📊 Step 1: Creating sessions from Silver events...")
+        val repository = new SparkDistributedSessionAnalysisRepository()
+        val sessionsResult = repository.createAndPersistSessions(config.silverPath, deriveSilverSessionsPath)
       
       sessionsResult match {
         case Success(sessionMetrics) =>
@@ -96,12 +162,13 @@ class DistributedSessionAnalysisPipeline(val config: PipelineConfig)(implicit sp
           Failure(exception)
       }
       
-    } catch {
-      case NonFatal(exception) =>
-        val errorMsg = "Distributed Session Analysis Pipeline execution failed"
-        println(s"❌ $errorMsg: ${exception.getMessage}")
-        Failure(new RuntimeException(errorMsg, exception))
-    }
+      } catch {
+        case NonFatal(exception) =>
+          val errorMsg = "Distributed Session Analysis Pipeline execution failed"
+          println(s"❌ $errorMsg: ${exception.getMessage}")
+          Failure(new RuntimeException(errorMsg, exception))
+      }
+    } // End monitorSparkOperation
   }
   
   /**

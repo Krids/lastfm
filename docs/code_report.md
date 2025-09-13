@@ -169,34 +169,13 @@ ListenEvent.minimal(
 
 ---
 
-#### **`SessionBoundaryDetector`**
+# SessionBoundaryDetector - REMOVED
 
-**Purpose**: Pure domain logic for detecting session boundaries using time gap algorithm.
+**Note**: The original `SessionBoundaryDetector` domain class has been removed as it was unused in production code.
 
-**Location**: `/src/main/scala/com/lastfm/sessions/domain/SessionBoundaryDetector.scala`
+**Current Implementation**: Session boundary detection is now handled by Spark SQL window functions in `SparkDistributedSessionAnalysisRepository.scala` for distributed, scalable processing.
 
-**Key Methods**:
-- `detectBoundaries(events: List[ListenEvent], sessionGap: Duration): List[Int]`
-  - **Algorithm**: 
-    1. First event always starts session (index 0)
-    2. Compare consecutive event timestamps
-    3. If gap > threshold, mark new session boundary
-    4. Return list of boundary indices
-  - **Complexity**: O(n) single pass
-  - **Memory**: O(k) where k = number of boundaries
-
-**Implementation Details**:
-- Tail-recursive for stack safety
-- Pure function with no side effects
-- Handles edge cases (empty list, single event, identical timestamps)
-
-**Critical Bug Prevention**:
-- First event MUST always start a session (prevents sessions = users bug)
-- Proper handling of edge cases
-
-**Testing**: `/src/test/scala/com/lastfm/sessions/domain/SessionBoundaryDetectorSpec.scala`
-- Property-based testing with ScalaCheck
-- Edge case coverage with table-driven tests
+**Reason for Removal**: The pure domain function couldn't scale to handle 19M+ records efficiently, while the Spark window function implementation processes sessions distributively across the cluster.
 
 ---
 
@@ -1051,9 +1030,8 @@ val contextualValidation = baseRule.withContext(Map(
 
 ### **Key Test Specifications**
 
-#### **SessionBoundaryDetectorSpec**
-- Property-based testing with ScalaCheck
-- Edge case coverage (empty, single, identical timestamps)
+# SessionBoundaryDetectorSpec - REMOVED
+# Test was removed along with the unused SessionBoundaryDetector domain class
 - Table-driven tests for various gap thresholds
 - Validates 20-minute gap algorithm
 
