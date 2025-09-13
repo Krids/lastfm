@@ -2,28 +2,20 @@ ThisBuild / version := "1.0.0"
 ThisBuild / scalaVersion := "2.13.14"  // Updated to latest stable 2.13.x
 ThisBuild / organization := "com.lastfm"
 
+// Java version configuration
+ThisBuild / javacOptions ++= Seq("-source", "11", "-target", "11")
+ThisBuild / javaOptions ++= Seq("-Xmx2g", "-XX:+UseG1GC")
+
 lazy val root = (project in file("."))
   .settings(
     name := "lastfm-session-analyzer",
     
     // Dependencies with SLF4J conflict resolution
-    libraryDependencies ++= Seq(
-      // Spark dependencies - exclude conflicting logging
-      "org.apache.spark" %% "spark-core" % "3.5.0" exclude("org.slf4j", "slf4j-log4j12"),
-      "org.apache.spark" %% "spark-sql" % "3.5.0" exclude("org.slf4j", "slf4j-log4j12"),
-      
-      // Configuration
-      "com.typesafe" % "config" % "1.4.3",
-      
-      // Logging - single provider only
-      "ch.qos.logback" % "logback-classic" % "1.4.11",
-      
-      // Test dependencies
-      "org.scalatest" %% "scalatest" % "3.2.17" % Test,
-      "org.scalacheck" %% "scalacheck" % "1.17.0" % Test,
-      "org.scalamock" %% "scalamock" % "5.2.0" % Test,
-      "org.scalatestplus" %% "scalacheck-1-17" % "3.2.17.0" % Test
-    ),
+    libraryDependencies ++= Dependencies.all.map {
+      case dep if dep.organization == "org.apache.spark" => 
+        dep exclude("org.slf4j", "slf4j-log4j12")
+      case dep => dep
+    },
     
     // Force single SLF4J implementation
     dependencyOverrides ++= Seq(

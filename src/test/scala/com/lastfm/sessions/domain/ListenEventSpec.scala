@@ -24,12 +24,10 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
     val validUserId = "user_000001"
     
     // Act
-    val event = ListenEvent(
+    val event = ListenEvent.minimal(
       userId = validUserId,
       timestamp = Instant.now(),
-      artistId = None,
       artistName = "Test Artist",
-      trackId = None,
       trackName = "Test Track"
     )
     
@@ -42,12 +40,10 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
     val validTimestamp = Instant.parse("2009-05-04T23:08:57Z")
     
     // Act
-    val event = ListenEvent(
+    val event = ListenEvent.minimal(
       userId = "user_000001",
       timestamp = validTimestamp,
-      artistId = None,
       artistName = "Test Artist",
-      trackId = None,
       trackName = "Test Track"
     )
     
@@ -60,12 +56,10 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
     val validArtistName = "Deep Dish"
     
     // Act
-    val event = ListenEvent(
+    val event = ListenEvent.minimal(
       userId = "user_000001",
       timestamp = Instant.now(),
-      artistId = None,
       artistName = validArtistName,
-      trackId = None,
       trackName = "Test Track"
     )
     
@@ -78,12 +72,10 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
     val validTrackName = "Fuck Me Im Famous (Pacha Ibiza)-09-28-2007"
     
     // Act
-    val event = ListenEvent(
+    val event = ListenEvent.minimal(
       userId = "user_000001",
       timestamp = Instant.now(),
-      artistId = None,
       artistName = "Test Artist",
-      trackId = None,
       trackName = validTrackName
     )
     
@@ -95,14 +87,15 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
     // Arrange
     val artistId = Some("f1b1cf71-bd35-4e99-8624-24a6e15f133a")
     
-    // Act
+    // Act - Use full constructor to test optional artistId
     val event = ListenEvent(
       userId = "user_000001",
       timestamp = Instant.now(),
       artistId = artistId,
       artistName = "Test Artist",
       trackId = None,
-      trackName = "Test Track"
+      trackName = "Test Track",
+      trackKey = "Test Artist — Test Track" // Fallback since no trackId
     )
     
     // Assert - Only test artistId assignment
@@ -111,12 +104,10 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
   
   it should "accept optional artistId as None" in {
     // Act
-    val event = ListenEvent(
+    val event = ListenEvent.minimal(
       userId = "user_000001",
       timestamp = Instant.now(),
-      artistId = None,
       artistName = "Test Artist",
-      trackId = None,
       trackName = "Test Track"
     )
     
@@ -128,14 +119,15 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
     // Arrange
     val trackId = Some("track_123")
     
-    // Act
+    // Act - Use full constructor to test optional trackId
     val event = ListenEvent(
       userId = "user_000001",
       timestamp = Instant.now(),
       artistId = None,
       artistName = "Test Artist",
       trackId = trackId,
-      trackName = "Test Track"
+      trackName = "Test Track",
+      trackKey = "track_123" // Use trackId as key when available
     )
     
     // Assert - Only test trackId assignment
@@ -144,12 +136,10 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
   
   it should "accept optional trackId as None" in {
     // Act
-    val event = ListenEvent(
+    val event = ListenEvent.minimal(
       userId = "user_000001",
       timestamp = Instant.now(),
-      artistId = None,
       artistName = "Test Artist",
-      trackId = None,
       trackName = "Test Track"
     )
     
@@ -169,7 +159,8 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
         artistId = None,
         artistName = "Test Artist",
         trackId = None,
-        trackName = "Test Track"
+        trackName = "Test Track",
+        trackKey = "Test Artist — Test Track"
       )
     }
   }
@@ -183,7 +174,8 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
         artistId = None,
         artistName = "Test Artist",
         trackId = None,
-        trackName = "Test Track"
+        trackName = "Test Track",
+        trackKey = "Test Artist — Test Track"
       )
     }
   }
@@ -197,7 +189,8 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
         artistId = None,
         artistName = "",
         trackId = None,
-        trackName = "Test Track"
+        trackName = "Test Track",
+        trackKey = "Test Track" // Will fail anyway due to empty artistName
       )
     }
   }
@@ -211,7 +204,8 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
         artistId = None,
         artistName = "   ",
         trackId = None,
-        trackName = "Test Track"
+        trackName = "Test Track",
+        trackKey = "Test Track" // Will fail anyway due to blank artistName
       )
     }
   }
@@ -225,7 +219,8 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
         artistId = None,
         artistName = null,
         trackId = None,
-        trackName = "Test Track"
+        trackName = "Test Track",
+        trackKey = "Test Track" // Will fail anyway due to null artistName
       )
     }
   }
@@ -239,7 +234,8 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
         artistId = None,
         artistName = "Test Artist",
         trackId = None,
-        trackName = ""
+        trackName = "",
+        trackKey = "Test Artist" // Will fail anyway due to empty trackName
       )
     }
   }
@@ -253,7 +249,8 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
         artistId = None,
         artistName = "Test Artist",
         trackId = None,
-        trackName = "   "
+        trackName = "   ",
+        trackKey = "Test Artist" // Will fail anyway due to blank trackName
       )
     }
   }
@@ -267,7 +264,8 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
         artistId = None,
         artistName = "Test Artist",
         trackId = None,
-        trackName = null
+        trackName = null,
+        trackKey = "Test Artist" // Will fail anyway due to null trackName
       )
     }
   }
@@ -280,12 +278,10 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
     val japaneseArtist = "坂本龍一"
     
     // Act
-    val event = ListenEvent(
+    val event = ListenEvent.minimal(
       userId = "user_000001",
       timestamp = Instant.now(),
-      artistId = None,
       artistName = japaneseArtist,
-      trackId = None,
       trackName = "Test Track"
     )
     
@@ -298,12 +294,10 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
     val unicodeTrack = "Composition 0919 (Live_2009_4_15)"
     
     // Act
-    val event = ListenEvent(
+    val event = ListenEvent.minimal(
       userId = "user_000001",
       timestamp = Instant.now(),
-      artistId = None,
       artistName = "Test Artist",
-      trackId = None,
       trackName = unicodeTrack
     )
     
@@ -316,12 +310,10 @@ class ListenEventSpec extends AnyFlatSpec with Matchers {
     val specialCharArtist = "Sigur Rós"
     
     // Act
-    val event = ListenEvent(
+    val event = ListenEvent.minimal(
       userId = "user_000001",
       timestamp = Instant.now(),
-      artistId = None,
       artistName = specialCharArtist,
-      trackId = None,
       trackName = "Test Track"
     )
     

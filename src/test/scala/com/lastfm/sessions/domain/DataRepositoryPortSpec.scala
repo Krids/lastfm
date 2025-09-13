@@ -29,7 +29,7 @@ class DataRepositoryPortSpec extends AnyFlatSpec with Matchers with MockFactory 
   "DataRepositoryPort successful loading" should "return Success when file exists" in new TestContext {
     // Arrange
     val validPath = "data/valid-file.tsv"
-    val sampleEvent = ListenEvent("user_001", Instant.now(), None, "Artist", None, "Track")
+    val sampleEvent = ListenEvent.minimal("user_001", Instant.now(), "Artist", "Track")
     (mockDataRepository.loadListenEvents _)
       .expects(validPath)
       .returning(Success(List(sampleEvent)))
@@ -45,8 +45,8 @@ class DataRepositoryPortSpec extends AnyFlatSpec with Matchers with MockFactory 
     // Arrange
     val validPath = "data/with-data.tsv"
     val sampleEvents = List(
-      ListenEvent("user_001", Instant.now(), None, "Artist1", None, "Track1"),
-      ListenEvent("user_002", Instant.now(), None, "Artist2", None, "Track2")
+      ListenEvent.minimal("user_001", Instant.now(), "Artist1", "Track1"),
+      ListenEvent.minimal("user_002", Instant.now(), "Artist2", "Track2")
     )
     (mockDataRepository.loadListenEvents _)
       .expects(validPath)
@@ -64,7 +64,7 @@ class DataRepositoryPortSpec extends AnyFlatSpec with Matchers with MockFactory 
     val validPath = "data/counted-events.tsv"
     val expectedCount = 3
     val sampleEvents = List.fill(expectedCount)(
-      ListenEvent("user_001", Instant.now(), None, "Artist", None, "Track")
+      ListenEvent.minimal("user_001", Instant.now(), "Artist", "Track")
     )
     (mockDataRepository.loadListenEvents _)
       .expects(validPath)
@@ -170,7 +170,8 @@ class DataRepositoryPortSpec extends AnyFlatSpec with Matchers with MockFactory 
       artistId = Some("artist_id"),
       artistName = "Deep Dish",
       trackId = Some("track_id"),
-      trackName = "Track Name"
+      trackName = "Track Name",
+      trackKey = "track_id" // Use track MBID as key when available
     )
     (mockDataRepository.loadListenEvents _)
       .expects(validPath)
@@ -210,7 +211,7 @@ class DataRepositoryPortSpec extends AnyFlatSpec with Matchers with MockFactory 
   it should "validate userId format" in new TestContext {
     // Arrange
     val validPath = "data/validated-userids.tsv"
-    val validUserEvent = ListenEvent("user_000001", Instant.now(), None, "Artist", None, "Track")
+    val validUserEvent = ListenEvent.minimal("user_000001", Instant.now(), "Artist", "Track")
     (mockDataRepository.loadListenEvents _)
       .expects(validPath)
       .returning(Success(List(validUserEvent)))
@@ -226,7 +227,7 @@ class DataRepositoryPortSpec extends AnyFlatSpec with Matchers with MockFactory 
     // Arrange
     val validPath = "data/validated-timestamps.tsv"
     val validTimestamp = Instant.parse("2009-05-04T23:08:57Z")
-    val timestampEvent = ListenEvent("user_001", validTimestamp, None, "Artist", None, "Track")
+    val timestampEvent = ListenEvent.minimal("user_001", validTimestamp, "Artist", "Track")
     (mockDataRepository.loadListenEvents _)
       .expects(validPath)
       .returning(Success(List(timestampEvent)))

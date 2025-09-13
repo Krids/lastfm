@@ -1,6 +1,6 @@
 package com.lastfm.sessions.infrastructure
 
-import com.lastfm.sessions.domain.ListenEvent
+import com.lastfm.sessions.domain.{ListenEvent, LastFmDataValidation}
 import org.scalatest.propspec.AnyPropSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -55,7 +55,10 @@ class DataLoadingProperties extends AnyPropSpec with Matchers with ScalaCheckPro
     timestamp <- validTimestampGen
     artistName <- validArtistNameGen
     trackName <- validTrackNameGen
-  } yield ListenEvent(userId, timestamp, None, artistName, None, trackName)
+  } yield {
+    val trackKey = LastFmDataValidation.generateTrackKey(None, artistName, trackName)
+    ListenEvent(userId, timestamp, None, artistName, None, trackName, trackKey)
+  }
   
   // Helper to create temporary files and clean them up
   var tempFiles: List[Path] = List.empty
@@ -226,7 +229,10 @@ class DataLoadingProperties extends AnyPropSpec with Matchers with ScalaCheckPro
       timestamp <- validTimestampGen
       artistName <- Gen.const("坂本龍一")
       trackName <- Gen.const("Composition 日本")
-    } yield ListenEvent(userId, timestamp, None, artistName, None, trackName)
+    } yield {
+    val trackKey = LastFmDataValidation.generateTrackKey(None, artistName, trackName)
+    ListenEvent(userId, timestamp, None, artistName, None, trackName, trackKey)
+  }
     
     // Use Gen.listOfN to ensure non-empty lists of controlled size
     val japaneseEventListGen = for {
@@ -255,7 +261,10 @@ class DataLoadingProperties extends AnyPropSpec with Matchers with ScalaCheckPro
       timestamp <- validTimestampGen
       artistName <- Gen.const("Sigur Rós")
       trackName <- Gen.const("Café del Mar")
-    } yield ListenEvent(userId, timestamp, None, artistName, None, trackName)
+    } yield {
+    val trackKey = LastFmDataValidation.generateTrackKey(None, artistName, trackName)
+    ListenEvent(userId, timestamp, None, artistName, None, trackName, trackKey)
+  }
     
     // Use Gen.listOfN to ensure non-empty lists of controlled size
     val specialEventListGen = for {

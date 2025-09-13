@@ -1,10 +1,12 @@
 package com.lastfm.sessions.infrastructure
 
-import com.lastfm.sessions.domain.{DataRepositoryPort, ListenEvent}
+import com.lastfm.sessions.domain.{DataRepositoryPort, ListenEvent, DataQualityMetrics}
 import org.apache.spark.sql.{SparkSession, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import java.time.Instant
+import java.nio.file.{Files, Paths}
+import java.nio.charset.StandardCharsets
 import scala.util.{Try, Success, Failure}
 import scala.util.control.NonFatal
 
@@ -121,7 +123,8 @@ class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPo
         artistId = artistIdOpt,
         artistName = artistName,
         trackId = trackIdOpt,
-        trackName = trackName
+        trackName = trackName,
+        trackKey = trackIdOpt.getOrElse(s"$artistName — $trackName")
       )
       
       Success(event)
@@ -131,5 +134,128 @@ class SparkDataRepository(implicit spark: SparkSession) extends DataRepositoryPo
         // Log the error but don't fail the entire operation
         Failure(exception)
     }
+  }
+
+  override def loadWithDataQuality(dataSourcePath: String): Try[(List[ListenEvent], DataQualityMetrics)] = {
+    // Simple implementation for now
+    val events = loadListenEvents(dataSourcePath).getOrElse(List.empty)
+    val metrics = DataQualityMetrics(
+      totalRecords = events.length.toLong,
+      validRecords = events.length.toLong,
+      rejectedRecords = 0L,
+      rejectionReasons = Map.empty,
+      trackIdCoverage = 0.0,
+      suspiciousUsers = 0L
+    )
+    Success((events, metrics))
+  }
+
+  override def cleanAndPersist(inputPath: String, outputPath: String): Try[DataQualityMetrics] = {
+    try {
+      // Load and process the data
+      val eventsResult = loadListenEvents(inputPath)
+      
+      // Count total input records (including invalid ones)
+      val totalInputRecords = countTotalInputRecords(inputPath)
+      
+      eventsResult match {
+        case Success(events) =>
+          val totalRecords = totalInputRecords
+          val validRecords = events.length.toLong // Only successfully loaded events
+          val rejectedRecords = totalRecords - validRecords // Records that were filtered out
+          
+          // Calculate track ID coverage
+          val trackIdCoverage = if (events.nonEmpty) {
+            val withTrackId = events.count(_.trackId.nonEmpty)
+            (withTrackId.toDouble / events.length) * 100.0
+          } else 0.0
+          
+          // Calculate suspicious users (users with >100k plays)
+          val suspiciousUsers = events.groupBy(_.userId).values.count(_.length > 100000)
+          
+          val qualityMetrics = DataQualityMetrics(
+            totalRecords = totalRecords,
+            validRecords = validRecords,
+            rejectedRecords = rejectedRecords,
+            rejectionReasons = Map.empty, // Could be enhanced to track specific rejection reasons
+            trackIdCoverage = trackIdCoverage,
+            suspiciousUsers = suspiciousUsers
+          )
+          
+          // Write quality report
+          writeQualityReport(qualityMetrics, outputPath)
+          
+          Success(qualityMetrics)
+          
+        case Failure(exception) =>
+          Failure(exception)
+      }
+    } catch {
+      case NonFatal(exception) =>
+        Failure(exception)
+    }
+  }
+  
+  private def countTotalInputRecords(inputPath: String): Long = {
+    try {
+      val lines = Files.readAllLines(Paths.get(inputPath), StandardCharsets.UTF_8)
+      lines.size.toLong
+    } catch {
+      case _: Exception => 0L
+    }
+  }
+
+  private def writeQualityReport(metrics: DataQualityMetrics, outputPath: String): Unit = {
+    val qualityReportPath = getQualityReportPath(outputPath)
+    val reportContent = generateQualityReportJSON(metrics)
+    
+    val outputFile = Paths.get(qualityReportPath)
+    val outputDir = outputFile.getParent
+    if (outputDir != null) {
+      Files.createDirectories(outputDir)
+    }
+    
+    Files.write(outputFile, reportContent.getBytes(StandardCharsets.UTF_8))
+  }
+  
+  private def getQualityReportPath(outputPath: String): String = {
+    val outputFile = Paths.get(outputPath)
+    val outputDir = Option(outputFile.getParent).getOrElse(Paths.get("."))
+    val baseFileName = outputFile.getFileName.toString.replaceAll("\\.[^.]*$", "")
+    outputDir.resolve(s"$baseFileName-quality-report.json").toAbsolutePath.toString
+  }
+  
+  private def generateQualityReportJSON(metrics: DataQualityMetrics): String = {
+    val rejectionReasonsJson = metrics.rejectionReasons.map { case (reason, count) =>
+      s""""$reason": $count"""
+    }.mkString(", ")
+    
+    s"""{
+  "timestamp": "${java.time.Instant.now()}",
+  "dataset": "lastfm-1k",
+  "processing": {
+    "totalRecords": ${metrics.totalRecords},
+    "validRecords": ${metrics.validRecords},
+    "rejectedRecords": ${metrics.rejectedRecords},
+    "qualityScore": ${metrics.qualityScore}
+  },
+  "dataCharacteristics": {
+    "trackIdCoverage": ${metrics.trackIdCoverage},
+    "suspiciousUsers": ${metrics.suspiciousUsers}
+  },
+  "qualityAssessment": {
+    "isSessionAnalysisReady": ${metrics.isSessionAnalysisReady},
+    "isProductionReady": ${metrics.isProductionReady},
+    "hasAcceptableTrackCoverage": ${metrics.hasAcceptableTrackCoverage}
+  },
+  "rejectionReasons": {
+    $rejectionReasonsJson
+  },
+  "thresholds": {
+    "sessionAnalysisMinQuality": 99.0,
+    "productionMinQuality": 99.9,
+    "minTrackIdCoverage": 85.0
+  }
+}"""
   }
 }
