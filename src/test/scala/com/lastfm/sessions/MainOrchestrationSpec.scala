@@ -4,6 +4,7 @@ import com.lastfm.sessions.pipelines.{DataCleaningPipeline, PipelineConfig, User
 import com.lastfm.sessions.orchestration.{PipelineOrchestrator, ProductionConfigManager, SparkSessionManager, PipelineExecutionResult}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.SparkSession
 import java.nio.file.{Files, Paths}
 import java.nio.charset.StandardCharsets
@@ -30,13 +31,18 @@ import scala.util.{Try, Success}
  * @author Felipe Lana Machado
  * @since 1.0.0
  */
-class MainOrchestrationSpec extends AnyFlatSpec with Matchers {
+class MainOrchestrationSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach {
 
   // Test directories for orchestration testing
   val testBaseDir = "/tmp/orchestration-test"
   val bronzeDir = s"$testBaseDir/bronze"
   val silverDir = s"$testBaseDir/silver" 
   val goldDir = s"$testBaseDir/gold"
+  
+  override def afterEach(): Unit = {
+    cleanupSessionAnalysisTestArtifacts()
+    super.afterEach()
+  }
 
   /**
    * Tests for command-line argument parsing and pipeline selection.
@@ -186,6 +192,26 @@ class MainOrchestrationSpec extends AnyFlatSpec with Matchers {
   /**
    * Helper methods for orchestration testing.
    */
+  /**
+   * Cleans up session analysis test artifacts that are created in the actual Silver layer.
+   */
+  private def cleanupSessionAnalysisTestArtifacts(): Unit = {
+    Try {
+      val silverSessionsPath = Paths.get("data/output/silver/sessions.parquet")
+      if (Files.exists(silverSessionsPath)) {
+        println(s"🧹 Cleaning up session analysis test artifacts: $silverSessionsPath")
+        Files.walk(silverSessionsPath)
+          .sorted(java.util.Comparator.reverseOrder())
+          .forEach(Files.deleteIfExists)
+        println("✅ Session analysis test artifacts cleaned")
+      }
+    }.recover {
+      case ex: Exception =>
+        println(s"⚠️  Could not clean session analysis artifacts: ${ex.getMessage}")
+        // Don't fail tests due to cleanup issues
+    }
+  }
+
   private def createTestDataForOrchestration(): String = {
     Files.createDirectories(Paths.get(bronzeDir))
     
@@ -205,7 +231,7 @@ class MainOrchestrationSpec extends AnyFlatSpec with Matchers {
     
     PipelineConfig(
       bronzePath = bronzePath,
-      silverPath = s"$silverDir/orchestration-output.tsv",
+      silverPath = s"$silverDir/orchestration-output", // Parquet directory, not .tsv file
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")

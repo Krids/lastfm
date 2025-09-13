@@ -31,7 +31,7 @@ object SparkSessionManager {
    */
   def createProductionSession(): SparkSession = {
     val cores = Runtime.getRuntime.availableProcessors()
-    val optimalPartitions = cores * 3 // I/O-intensive operations
+    val optimalPartitions = 16 // Optimal for 1K users session analysis (~62 users per partition)
     val heapSizeGB = (Runtime.getRuntime.maxMemory() / 1024 / 1024 / 1024).toInt
     
     SparkSession.builder()
@@ -42,11 +42,16 @@ object SparkSessionManager {
       .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") // Performance
       .config("spark.sql.adaptive.enabled", "true") // Adaptive query execution
       .config("spark.sql.adaptive.coalescePartitions.enabled", "true") // Smart coalescing
-      .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "64MB") // Optimal partition size
-      .config("spark.driver.maxResultSize", "4g") // Accommodate large results safely
-      .config("spark.driver.memory", s"${Math.min(heapSizeGB - 1, 6)}g") // Reserve memory
-      .config("spark.executor.memory", "2g") // Local executor memory
+      .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "128MB") // Larger partitions for 19M records
+      .config("spark.driver.maxResultSize", "8g") // Accommodate large results for 19M records
+      .config("spark.driver.memory", s"${Math.min(heapSizeGB - 2, 16)}g") // More memory for large dataset
+      .config("spark.executor.memory", "4g") // Increased executor memory
       .config("spark.local.dir", System.getProperty("java.io.tmpdir")) // Temp storage
+      .config("spark.sql.adaptive.coalescePartitions.initialPartitionNum", "16") // Start with optimal partitions
+      .config("spark.sql.adaptive.skewJoin.enabled", "true") // Handle data skew
+      .config("spark.sql.files.maxPartitionBytes", "134217728") // 128MB per file partition
+      .config("spark.sql.execution.arrow.pyspark.enabled", "false") // Disable for Scala optimization
+      .config("spark.driver.extraJavaOptions", getOptimalJVMOptions()) // Enterprise JVM tuning
       .getOrCreate()
   }
 
@@ -67,6 +72,43 @@ object SparkSessionManager {
       .config("spark.ui.enabled", "false") // Disable UI for tests
       .config("spark.driver.memory", "1g") // Minimal memory for tests
       .getOrCreate()
+  }
+
+  /**
+   * Generates optimal JVM options for enterprise-scale data processing.
+   * 
+   * Optimized for 96GB RAM systems processing 19M+ records:
+   * - G1GC for large heap efficiency (>32GB)
+   * - Low-latency garbage collection settings
+   * - Memory optimization for big data workloads
+   * - Performance tuning for Spark driver operations
+   */
+  private def getOptimalJVMOptions(): String = {
+    val maxHeapGB = Runtime.getRuntime.maxMemory() / 1024 / 1024 / 1024
+    
+    if (maxHeapGB >= 32) {
+      // High-memory enterprise configuration (32GB+)
+      "-XX:+UseG1GC " +
+      "-XX:G1HeapRegionSize=16m " +
+      "-XX:+G1UseAdaptiveIHOP " +
+      "-XX:G1MixedGCCountTarget=8 " +
+      "-XX:G1HeapWastePercent=5 " +
+      "-XX:+UnlockExperimentalVMOptions " +
+      "-XX:+UseLargePages " +
+      "-XX:+AlwaysPreTouch " +
+      "-XX:+DisableExplicitGC " +
+      "-Djava.awt.headless=true"
+    } else if (maxHeapGB >= 8) {
+      // Medium-memory configuration (8-32GB) 
+      "-XX:+UseG1GC " +
+      "-XX:G1HeapRegionSize=8m " +
+      "-XX:+G1UseAdaptiveIHOP " +
+      "-Djava.awt.headless=true"
+    } else {
+      // Default configuration (<8GB)
+      "-XX:+UseParallelGC " +
+      "-Djava.awt.headless=true"
+    }
   }
 
   /**

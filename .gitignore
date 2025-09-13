@@ -4,24 +4,35 @@
 # Bronze Layer (Raw Data) - Keep structure, exclude large files
 data/lastfm/                    # Large dataset files
 data/input/                     # Input data (except samples)
+data/input/lastfm-dataset-1k/   # Last.fm dataset 1k
+data/input/lastfm-dataset-1k/*.tsv
+data/input/*.tsv
+data/input/*.gz
 
 # Silver Layer (Quality-Validated Clean Data) - Exclude generated artifacts, keep structure
 data/output/silver/*.tsv        # Generated clean data artifacts
+data/output/silver/*.parquet
 data/output/silver/*.json       # Generated quality reports
 data/output/silver/*_spark_output/  # Spark output directories
 data/output/silver/lastfm-*    # Generated production artifacts
+/data/output/silver/lastfm-listening-events-cleaned.tsv_tsv_data
 
 # Gold Layer (Session Analysis Results) - Exclude generated artifacts, keep structure  
 data/output/gold/*.tsv          # Generated session analysis results
+data/output/gold/*.parquet
 data/output/gold/*.json         # Generated session metrics
 data/output/gold/*_spark_output/    # Spark output directories
+data/output/gold/listening-events-cleaned-session-analytics
 
 # Results Layer (Final Pipeline Output) - Exclude generated artifacts, keep structure
+data/output/results/*.parquet
 data/output/results/*.tsv       # Generated final results (top_songs.tsv)
 data/output/results/*.json      # Generated pipeline summary
+data/output/results/*.parquet
 
 # Catch-all for data output artifacts
 data/output/**/*.tsv
+data/output/**/*.parquet
 data/output/**/*.json
 data/output/**/*_spark_output/
 
@@ -43,6 +54,8 @@ data/output/**/*_spark_output/
 
 # Keep sample data for testing and documentation
 !data/sample/
+!data/sample/*.tsv             # Keep sample TSV files for testing
+!data/sample/*.json            # Keep sample metadata files
 
 # ===========================
 # SBT / Scala Build Artifacts

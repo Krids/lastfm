@@ -63,4 +63,39 @@ trait DataRepositoryPort {
    * @return Try containing quality metrics or error
    */
   def cleanAndPersist(inputPath: String, outputPath: String): Try[DataQualityMetrics]
+
+  /**
+   * Loads cleaned listening events from Silver layer for session analysis.
+   * 
+   * Optimized for session analysis processing:
+   * - Loads quality-validated events from Silver layer artifacts
+   * - Applies optimal partitioning strategy for session calculation
+   * - Handles large datasets efficiently with distributed processing
+   * - Maintains data lineage from Silver layer processing
+   * 
+   * @param silverPath Path to Silver layer cleaned data (TSV format)
+   * @return Try containing list of validated listening events or error
+   */
+  def loadCleanedEvents(silverPath: String): Try[List[ListenEvent]]
+
+  /**
+   * Persists session analysis results to Gold layer for downstream consumption.
+   * 
+   * Implements Silver → Gold transformation with comprehensive artifacts:
+   * - Gold Layer: Session analysis results with top sessions ranking
+   * - Session metrics: Statistical analysis and quality indicators
+   * - Data lineage: Complete audit trail from Silver to Gold processing
+   * 
+   * Artifacts generated:
+   * - {goldPath}/sessions.json: Complete session analysis results
+   * - {goldPath}/top-sessions.json: Top N longest sessions (configurable)
+   * - {goldPath}/session-metrics.json: Statistical analysis and quality metrics
+   * 
+   * @param sessions Session analysis results to persist
+   * @param goldPath Path to Gold layer output directory
+   * @param topSessionCount Number of top sessions to extract (default 50)
+   * @return Try containing success confirmation or error
+   */
+  // Note: persistSessionAnalysis method removed as it's replaced by 
+  // DistributedSessionAnalysisRepository with different interface
 }

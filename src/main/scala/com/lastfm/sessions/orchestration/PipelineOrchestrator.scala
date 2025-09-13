@@ -1,6 +1,7 @@
 package com.lastfm.sessions.orchestration
 
-import com.lastfm.sessions.pipelines.{PipelineConfig, DataCleaningPipeline}
+import com.lastfm.sessions.pipelines.{PipelineConfig, DistributedSessionAnalysisPipeline}
+import com.lastfm.sessions.application.DataCleaningServiceFactory
 import com.lastfm.sessions.domain.DataQualityMetrics
 import org.apache.spark.sql.SparkSession
 import scala.util.{Try, Success, Failure}
@@ -53,36 +54,68 @@ object PipelineOrchestrator {
   }
 
   /**
-   * Executes Data Cleaning Pipeline (Bronze → Silver transformation).
+   * Executes Data Cleaning Service (Bronze → Silver transformation).
    */
   private def executeDataCleaningPipeline(config: PipelineConfig): PipelineExecutionResult = {
-    println("🧹 Executing Data Cleaning Pipeline (Bronze → Silver)")
+    println("🧹 Executing Data Cleaning Service (Bronze → Silver)")
     
     using(SparkSessionManager.createProductionSession()) { implicit spark =>
-      val pipeline = new DataCleaningPipeline(config)
-      val result = pipeline.execute()
+      val service = DataCleaningServiceFactory.createProductionService
+      val result = service.cleanData(config.bronzePath, config.silverPath)
       
       result match {
         case Success(qualityMetrics: DataQualityMetrics) =>
           println(s"✅ Data cleaning completed successfully")
           println(f"   Quality Score: ${qualityMetrics.qualityScore}%.6f%%")
           println(s"   Records: ${qualityMetrics.totalRecords} → ${qualityMetrics.validRecords}")
+          println(s"   Format: Parquet with optimal userId partitioning")
           PipelineExecutionResult.DataCleaningCompleted
           
         case Failure(exception) =>
-          throw new RuntimeException("Data cleaning pipeline failed", exception)
+          throw new RuntimeException("Data cleaning service failed", exception)
       }
     }
   }
 
   /**
-   * Executes Session Analysis Pipeline (Silver → Gold transformation).
-   * Future implementation - currently returns placeholder.
+   * Executes Distributed Session Analysis Service (Silver → Gold transformation).
+   * 
+   * Implements memory-efficient distributed session analysis processing:
+   * - Loads cleaned listening events from Silver layer as distributed streams
+   * - Applies 20-minute gap algorithm using Spark window functions
+   * - Generates comprehensive analysis without driver memory constraints
+   * - Persists structured Gold layer artifacts for downstream consumption
+   * 
+   * Key Improvements:
+   * - No OutOfMemoryError issues with large datasets (19M+ records)
+   * - Distributed processing using Spark DataFrames throughout
+   * - Window functions for efficient session boundary detection
+   * - Single-pass aggregations for metrics calculation
    */
   private def executeSessionAnalysisPipeline(config: PipelineConfig): PipelineExecutionResult = {
-    println("🔄 Session Analysis Pipeline - Not yet implemented")
-    println("   Next: UserSession domain model → SessionCalculator → Session analysis")
-    PipelineExecutionResult.SessionAnalysisCompleted
+    println("🔄 Executing Enhanced Session Analysis Pipeline (Silver → Silver + Gold)")
+    
+    using(SparkSessionManager.createProductionSession()) { implicit spark =>
+      // Use the new DistributedSessionAnalysisPipeline with JSON reports and Silver session persistence
+      val pipeline = new DistributedSessionAnalysisPipeline(config)
+      val result = pipeline.execute()
+      
+      result match {
+        case Success(analysis) =>
+          println(s"✅ Enhanced session analysis pipeline completed successfully")
+          println(f"   Sessions Generated: ${analysis.metrics.totalSessions}")
+          println(f"   Users Analyzed: ${analysis.metrics.uniqueUsers}")
+          println(f"   Quality Score: ${analysis.metrics.qualityScore}%.2f%%")
+          println(f"   Quality Assessment: ${analysis.qualityAssessment}")
+          println(f"   Performance Category: ${analysis.performanceCategory}")
+          println("📄 JSON report with all metrics generated in Gold layer")
+          println("💾 Sessions persisted to Silver layer (16 partitions)")
+          PipelineExecutionResult.SessionAnalysisCompleted
+          
+        case Failure(exception) =>
+          throw new RuntimeException("Enhanced session analysis pipeline failed", exception)
+      }
+    }
   }
 
   /**

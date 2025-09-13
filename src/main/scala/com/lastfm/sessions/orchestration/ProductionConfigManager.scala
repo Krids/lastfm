@@ -41,8 +41,8 @@ object ProductionConfigManager {
     
     PipelineConfig(
       // Medallion architecture paths for production
-      bronzePath = "data/lastfm/lastfm-dataset-1k/userid-timestamp-artid-artname-traid-traname.tsv",
-      silverPath = "data/output/silver/lastfm-listening-events-cleaned.tsv",
+      bronzePath = "data/input/lastfm-dataset-1k/userid-timestamp-artid-artname-traid-traname.tsv",
+      silverPath = "data/output/silver/listening-events-cleaned.parquet",
       
       // Environment-aware partitioning strategy
       partitionStrategy = UserIdPartitionStrategy(
@@ -60,7 +60,7 @@ object ProductionConfigManager {
       
       // Spark configuration optimized for 19M+ record processing
       sparkConfig = SparkConfig(
-        partitions = cores * 3,              // 3x cores for I/O-intensive operations
+        partitions = 16,                     // Optimal for 1K users (~62 users per partition)
         timeZone = "UTC",                    // Consistent timezone handling
         adaptiveEnabled = true,              // Enable adaptive query execution
         serializerClass = "org.apache.spark.serializer.KryoSerializer" // Performance

@@ -110,7 +110,7 @@ case class DataQualityMetrics(
    * Used for bot detection and data quality assessment.
    */
   def suspiciousUserRatio: Double = {
-    val estimatedUsers = Math.max(1000L, validRecords / 10000) // Rough estimate
+    val estimatedUsers = Math.max(1000L, validRecords / 100000) // Rough estimate
     (suspiciousUsers.toDouble / estimatedUsers) * 100.0
   }
 
