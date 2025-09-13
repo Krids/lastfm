@@ -228,7 +228,7 @@ object PipelineOrchestrator {
   /**
    * Displays usage help for command-line interface.
    */
-  private def displayUsageHelp(): Unit = {
+  def displayUsageHelp(): Unit = {
     println("🎵 Last.fm Session Analysis - Pipeline Orchestration")
     println("=" * 60)
     println("Usage: sbt \"runMain com.lastfm.sessions.Main [pipeline]\"")
