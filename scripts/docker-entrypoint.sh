@@ -46,11 +46,11 @@ case "$PIPELINE" in
         echo "  - Memory: 2g"
         echo "  - Partitions: ${SPARK_PARTITIONS:-2}"
         echo "  - Environment: test"
-        exec sbt -mem 2048 test
+        exec sbt $SBT_OPTS -mem 2048 test
         ;;
     "shell"|"console")
         echo "🐚 Starting interactive Scala console..."
-        exec sbt -mem $MEMORY_MB console
+        exec sbt $SBT_OPTS -mem $MEMORY_MB console
         ;;
     *)
         echo "🚀 Running pipeline: $PIPELINE"
@@ -61,7 +61,7 @@ case "$PIPELINE" in
         echo "  - Top Sessions: ${TOP_SESSIONS:-50}"
         echo "  - Top Tracks: ${TOP_TRACKS:-10}"
         
-        # CRITICAL: Proper SBT command quoting for runMain
-        exec sbt -mem $MEMORY_MB "runMain com.lastfm.sessions.Main $PIPELINE"
+        # CRITICAL: Proper SBT command quoting for runMain with environment settings
+        exec sbt $SBT_OPTS -mem $MEMORY_MB "runMain com.lastfm.sessions.Main $PIPELINE"
         ;;
 esac

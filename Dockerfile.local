@@ -50,17 +50,20 @@ RUN groupadd -r lastfm && useradd -r -g lastfm -d /app -s /bin/bash lastfm
 WORKDIR /app
 RUN chown -R lastfm:lastfm /app
 
-# Set default JVM settings (can be overridden at runtime)
-ENV JAVA_OPTS="-Xmx8g -XX:+UseG1GC -XX:+UseContainerSupport -XX:G1HeapRegionSize=16m"
+# Set default JVM settings and temp directories (can be overridden at runtime)
+ENV JAVA_OPTS="-Xmx8g -XX:+UseG1GC -XX:+UseContainerSupport -XX:G1HeapRegionSize=16m -Djava.io.tmpdir=/tmp/sbt"
+ENV SBT_OPTS="-Dsbt.global.base=/app/.sbt -Dsbt.boot.directory=/app/.sbt/boot -Dsbt.ivy.home=/app/.ivy2"
+ENV TMPDIR="/tmp/sbt"
 
 # Copy compiled application from builder stage
 COPY --from=builder /app/target /app/target
 COPY --from=builder /app/project /app/project
 COPY --from=builder /app/build.sbt /app/build.sbt
 
-# Create data directories with proper permissions
+# Create data directories and temp directories with proper permissions
 RUN mkdir -p data/input data/output/{bronze,silver,gold,results} logs && \
-    chown -R lastfm:lastfm data/ logs/
+    mkdir -p /tmp/sbt /tmp/ivy2 /app/.sbt /app/.ivy2 && \
+    chown -R lastfm:lastfm data/ logs/ /tmp/sbt /tmp/ivy2 /app/.sbt /app/.ivy2
 
 # Copy and configure entrypoint script
 COPY scripts/docker-entrypoint.sh /app/run.sh
