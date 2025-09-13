@@ -57,10 +57,11 @@ ENV TMPDIR="/app/tmp"
 ENV TMP="/app/tmp"
 ENV TEMP="/app/tmp"
 
-# Copy compiled application from builder stage
+# Copy compiled application and source code from builder stage
 COPY --from=builder /app/target /app/target
 COPY --from=builder /app/project /app/project
 COPY --from=builder /app/build.sbt /app/build.sbt
+COPY --from=builder /app/src /app/src
 
 # Create data directories and temp directories with proper permissions (BEFORE switching user)
 RUN mkdir -p data/input data/output/{bronze,silver,gold,results} logs && \
