@@ -1,7 +1,7 @@
 package com.lastfm.sessions.pipelines
 
 import com.lastfm.sessions.domain.DataQualityMetrics
-import com.lastfm.sessions.testutil.ParquetTestSpec
+import com.lastfm.sessions.testutil.{ParquetTestSpec, BaseTestSpec}
 import scala.util.{Success, Failure, Try}
 
 /**
@@ -24,7 +24,7 @@ import scala.util.{Success, Failure, Try}
  * @author Felipe Lana Machado
  * @since 1.0.0
  */
-class DataCleaningPipelineSpec extends ParquetTestSpec {
+class DataCleaningPipelineSpec extends ParquetTestSpec with BaseTestSpec {
 
   /**
    * Tests for configuration-driven pipeline execution.
@@ -37,6 +37,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val config = PipelineConfig(
       bronzePath = bronzePath,
       silverPath = silverPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 16, timeZone = "UTC")
@@ -56,6 +58,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
       new DataCleaningPipeline(PipelineConfig(
         bronzePath = "", // Invalid empty path
         silverPath = createTempOutputDir(),
+        goldPath = getTestPath("gold"),
+        outputPath = getTestPath("results"),
         partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
         qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
         sparkConfig = SparkConfig(partitions = 16, timeZone = "UTC")
@@ -78,6 +82,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val config = PipelineConfig(
       bronzePath = inputPath,
       silverPath = outputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")
@@ -112,6 +118,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val config = PipelineConfig(
       bronzePath = inputPath,
       silverPath = outputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")
@@ -150,6 +158,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val config = PipelineConfig(
       bronzePath = inputPath,
       silverPath = outputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 10, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")
@@ -197,6 +207,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val config = PipelineConfig(
       bronzePath = nonExistentPath,
       silverPath = outputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")
@@ -224,6 +236,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val config = PipelineConfig(
       bronzePath = inputPath,
       silverPath = outputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")
@@ -253,6 +267,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val config = PipelineConfig(
       bronzePath = inputPath,
       silverPath = outputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 20, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 95.0),
       sparkConfig = SparkConfig(partitions = 4, timeZone = "UTC") // 4 partitions for 20 users = ~5 users per partition
@@ -307,6 +323,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val config = PipelineConfig(
       bronzePath = inputPath,
       silverPath = outputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 10, cores = 2),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 90.0),
       sparkConfig = SparkConfig(partitions = 2, timeZone = "UTC")
@@ -343,6 +361,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val smallConfig = PipelineConfig(
       bronzePath = smallInputPath,
       silverPath = smallOutputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")
@@ -354,6 +374,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val mediumConfig = PipelineConfig(
       bronzePath = mediumInputPath,
       silverPath = mediumOutputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")
@@ -387,6 +409,8 @@ class DataCleaningPipelineSpec extends ParquetTestSpec {
     val config = PipelineConfig(
       bronzePath = inputPath,
       silverPath = outputPath,
+      goldPath = getTestPath("gold"),
+      outputPath = getTestPath("results"),
       partitionStrategy = UserIdPartitionStrategy(userCount = 8, cores = 4),
       qualityThresholds = QualityThresholds(sessionAnalysisMinQuality = 99.0),
       sparkConfig = SparkConfig(partitions = 8, timeZone = "UTC")

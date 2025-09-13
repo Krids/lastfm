@@ -203,9 +203,18 @@ class DataCleaningService(implicit spark: SparkSession) {
   private def createOptimalPipelineConfig(bronzePath: String, silverPath: String): PipelineConfig = {
     val cores = Runtime.getRuntime.availableProcessors()
     
+    // Determine environment-appropriate paths
+    val (goldPath, outputPath) = if (isTestEnvironment) {
+      ("data/test/gold", "data/test/results")
+    } else {
+      ("data/output/gold", "data/output/results")
+    }
+    
     PipelineConfig(
       bronzePath = bronzePath,
       silverPath = silverPath,
+      goldPath = goldPath,
+      outputPath = outputPath,
       partitionStrategy = UserIdPartitionStrategy(userCount = 1000, cores = cores),
       qualityThresholds = QualityThresholds(
         sessionAnalysisMinQuality = 99.0,
@@ -219,6 +228,19 @@ class DataCleaningService(implicit spark: SparkSession) {
         adaptiveEnabled = true
       )
     )
+  }
+  
+  /**
+   * Detects if running in test environment.
+   */
+  private def isTestEnvironment: Boolean = {
+    val testIndicators = Seq(
+      sys.props.get("sbt.main.class").exists(_.contains("sbt.")),
+      Thread.currentThread().getStackTrace.exists(_.getClassName.contains("scalatest")),
+      Thread.currentThread().getStackTrace.exists(_.getClassName.contains("Test")),
+      sys.env.get("SBT_TEST").isDefined
+    )
+    testIndicators.exists(identity)
   }
   
   /**

@@ -1,5 +1,5 @@
 ThisBuild / version := "1.0.0"
-ThisBuild / scalaVersion := "2.13.14"  // Updated to latest stable 2.13.x
+ThisBuild / scalaVersion := "2.13.16"  // Updated to latest stable 2.13.x
 ThisBuild / organization := "com.lastfm"
 
 // Java version configuration
@@ -132,6 +132,23 @@ lazy val root = (project in file("."))
     // Fork JVM for both main execution and tests (CRITICAL for applying JVM options)
     fork := true,
     Test / fork := true,
+    
+    // Code coverage configuration
+    coverageEnabled := true,
+    coverageMinimumStmtTotal := 80,
+    coverageMinimumBranchTotal := 70,
+    coverageFailOnMinimum := false, // Set to true once coverage targets are met
+    
+    // Coverage exclusions for generated/infrastructure code
+    coverageExcludedPackages := Seq(
+      "<empty>",  // Empty package
+      ".*\\.infrastructure\\..*", // Infrastructure adapters  
+      ".*\\.config\\..*",  // Configuration classes
+      ".*Main.*"  // Main application entry points
+    ).mkString(";"),
+    
+    // Coverage data directory
+    coverageDataDir := target.value / "scala-2.13" / "scoverage-data",
     
     // Main execution JVM options (Java 11 compatible)
     run / javaOptions ++= Seq(

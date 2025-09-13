@@ -295,3 +295,18 @@ data/output/*/*/test-*
 data/output/**/*test*
 data/output/**/temp-*
 data/output/**/tmp-*
+
+# Spark temporary files
+metastore_db/
+derby.log
+spark-warehouse/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Coverage reports
+target/scala-*/scoverage-data/
+target/scala-*/scoverage-report/
+target/coverage-reports/
