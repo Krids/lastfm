@@ -8,7 +8,7 @@ set -e
 # Configuration from environment variables
 PIPELINE=${1:-complete}
 ENV_NAME=${ENV:-development}
-JAVA_HEAP=$(echo "${JAVA_OPTS:-"-Xmx8g"}" | grep -oP '(?<=-Xmx)\d+[gG]?' | head -1)
+JAVA_HEAP=$(echo "${JAVA_OPTS:-"-Xmx8g"}" | sed -n 's/.*-Xmx\([0-9]*[gG]\?\).*/\1/p' | head -1)
 MEMORY_MB=$(echo "${JAVA_HEAP:-8g}" | sed 's/g/*1024/; s/G/*1024/' | bc 2>/dev/null || echo 8192)
 
 echo "🎵 LastFM Session Analysis - Docker Container"
@@ -51,6 +51,11 @@ case "$PIPELINE" in
     "shell"|"console")
         echo "🐚 Starting interactive Scala console..."
         exec sbt $SBT_OPTS -mem $MEMORY_MB console
+        ;;
+    "ls"|"pwd"|"whoami"|"id"|"uname")
+        echo "🔍 Running system command: $PIPELINE $*"
+        shift  # Remove the command from arguments
+        exec $PIPELINE "$@"
         ;;
     *)
         echo "🚀 Running pipeline: $PIPELINE"
