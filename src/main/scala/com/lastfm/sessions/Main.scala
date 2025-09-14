@@ -13,8 +13,8 @@ import com.lastfm.sessions.orchestration.{PipelineOrchestrator, ProductionConfig
  * 
  * AVAILABLE PIPELINES:
  * - data-cleaning: Bronze → Silver data quality transformation
- * - session-analysis: Silver → Gold session calculation (future)
- * - ranking: Gold → Results top songs ranking (future)
+ * - session-analysis: Silver → Gold session calculation
+ * - ranking: Gold → Results top songs ranking
  * - complete: Full pipeline execution (default)
  * 
  * COMMAND-LINE INTERFACE:
@@ -166,8 +166,7 @@ object Main extends App {
       case "data-cleaning" =>
         println(s"\n🚀 Next Steps:")
         println(s"   📄 Silver layer artifacts ready at: data/output/silver/")
-        println(s"   🎯 Next: Implement Session Analysis Context")
-        println(s"   🎯 Run: sbt \"runMain com.lastfm.sessions.Main session-analysis\"")
+        println(s"   🎯 Next: Run Session Analysis - sbt \"runMain com.lastfm.sessions.Main session-analysis\"")
         
       case "session-analysis" =>
         println(s"\n🚀 Next Steps:")
@@ -176,13 +175,13 @@ object Main extends App {
         
       case "ranking" =>
         println(s"\n🎯 Final Results:")
-        println(s"   📄 Check: data/output/gold/top_songs.tsv")
+        println(s"   📄 Check: data/output/results/top_songs.tsv")
         
       case "complete" | _ =>
         println(s"\n🎉 Complete Analysis Ready!")
         println(s"   📊 Data Quality Context: ✅ Complete")
-        println(s"   🔄 Session Analysis Context: 🔄 Ready for implementation")
-        println(s"   🏆 Ranking Context: ⏭️ Planned")
+        println(s"   🔄 Session Analysis Context: ✅ Complete") 
+        println(s"   🏆 Ranking Context: ✅ Complete")
     }
     
     println("=" * 90)
