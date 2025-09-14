@@ -161,20 +161,6 @@ trait TestEnvironment extends BeforeAndAfterAll with BeforeAndAfterEach { this: 
    * This ensures production directories remain clean.
    */
   private def cleanProductionTestArtifacts(): Unit = {
-    // Clean sessions.parquet from production Silver layer if it exists
-    val productionSessionsPath = Paths.get("data/output/silver/sessions.parquet")
-    if (Files.exists(productionSessionsPath)) {
-      Try {
-        println(s"🧹 Cleaning production test artifact: $productionSessionsPath")
-        Files.walk(productionSessionsPath)
-          .sorted(java.util.Comparator.reverseOrder())
-          .forEach(Files.deleteIfExists)
-      }.recover {
-        case ex: Exception =>
-          println(s"⚠️ Could not clean production sessions: ${ex.getMessage}")
-      }
-    }
-    
     // Clean any test-generated reports from production folders
     val testReportPatterns = List(
       "data/output/silver/test-",

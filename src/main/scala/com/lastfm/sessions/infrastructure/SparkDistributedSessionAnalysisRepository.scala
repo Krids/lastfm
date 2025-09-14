@@ -35,7 +35,8 @@ import scala.util.control.NonFatal
  * @since 1.0.0
  */
 class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession) 
-    extends DistributedSessionAnalysisRepository {
+    extends DistributedSessionAnalysisRepository 
+    with com.lastfm.sessions.common.traits.SparkConfigurable {
   
   import spark.implicits._
   
@@ -185,29 +186,60 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
   private def persistSessionsToSilver(sessionsDF: DataFrame, silverSessionsPath: String): Unit = {
     println(s"💾 Persisting sessions to Silver layer: $silverSessionsPath")
     
-    val optimalPartitions = 16 // Consistent with data-cleaning pipeline
-    val estimatedUsers = 992 // Based on current dataset
+    // Use the SAME method as data cleaning pipeline for consistency
+    val estimatedUsers = 1000 // Match data cleaning pipeline estimate
+    val cores = Runtime.getRuntime.availableProcessors()
+    val optimalPartitions = calculateOptimalPartitions(estimatedUsers, cores)
     
     println(s"📈 Session Partitioning Strategy:")
     println(s"   Target Partitions: $optimalPartitions")
     println(s"   Estimated Users: $estimatedUsers")  
     println(s"   Users per Partition: ~${estimatedUsers/optimalPartitions}")
-    println(s"   Partitioning Key: userId (optimal for session analysis)")
+    println(s"   Partitioning Key: userId (consistent with data cleaning)")
     
-    sessionsDF
-      .repartition(optimalPartitions, col("userId")) // Strategic partitioning consistent with architecture
-      .write
-      .mode("overwrite")
-      .option("compression", "snappy") // Optimal balance of speed and compression
-      .parquet(silverSessionsPath) // Creates exactly 16 parquet files
-    
-    println(s"✅ Sessions persisted with optimal partitioning:")
-    println(s"   Files Created: $optimalPartitions parquet files")
-    println(s"   Path: $silverSessionsPath/")
-    println(s"   Performance: Optimized for downstream ranking pipeline")
-    
-    // Validate partitioning
-    validateSessionPartitioning(silverSessionsPath)
+    try {
+      // Check if sessions DataFrame is empty before attempting to write
+      val sessionCount = sessionsDF.count()
+      if (sessionCount == 0) {
+        throw new RuntimeException("Sessions DataFrame is empty - no sessions to persist")
+      }
+      
+      println(s"📊 Writing $sessionCount sessions to Silver layer...")
+      
+      sessionsDF
+        .repartition(optimalPartitions, col("userId")) // Strategic partitioning consistent with architecture
+        .write
+        .mode("overwrite")
+        .option("compression", "snappy") // Optimal balance of speed and compression
+        .parquet(silverSessionsPath) // Creates optimal number of parquet files
+      
+      // Validate that the write actually succeeded
+      val sessionDir = new java.io.File(silverSessionsPath)
+      if (!sessionDir.exists()) {
+        throw new RuntimeException(s"Session write failed - directory not created: $silverSessionsPath")
+      }
+      
+      val sessionFiles = sessionDir.listFiles()
+        .filter(_.getName.startsWith("part-"))
+      
+      if (sessionFiles.isEmpty) {
+        throw new RuntimeException(s"Session write failed - no partition files created in: $silverSessionsPath")
+      }
+      
+      println(s"✅ Sessions persisted with optimal partitioning:")
+      println(s"   Files Created: ${sessionFiles.length} parquet files")
+      println(s"   Path: $silverSessionsPath/")
+      println(s"   Performance: Consistent with data cleaning pipeline")
+      
+      // Validate partitioning (now only if write succeeded)
+      validateSessionPartitioning(silverSessionsPath, optimalPartitions)
+      
+    } catch {
+      case NonFatal(e) =>
+        val errorMsg = s"Failed to persist sessions to Silver layer: ${e.getMessage}"
+        println(s"❌ $errorMsg")
+        throw new RuntimeException(errorMsg, e)
+    }
   }
   
   /**
@@ -222,8 +254,11 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
    */
   /**
    * Validates session partitioning after persistence.
+   * 
+   * @param silverSessionsPath Path to Silver layer sessions
+   * @param expectedPartitions Expected number of partition files
    */
-  private def validateSessionPartitioning(silverSessionsPath: String): Unit = {
+  private def validateSessionPartitioning(silverSessionsPath: String, expectedPartitions: Int): Unit = {
     println("🔍 Validating session partitioning...")
     
     try {
@@ -233,13 +268,13 @@ class SparkDistributedSessionAnalysisRepository(implicit spark: SparkSession)
           .filter(_.getName.startsWith("part-"))
         
         println(s"✅ Partition validation successful:")
-        println(s"   Expected: 16 partitions")
+        println(s"   Expected: $expectedPartitions partitions")
         println(s"   Actual: ${sessionFiles.length} partitions") 
         
-        if (sessionFiles.length == 16) {
-          println("🎯 Perfect! Partition count matches architecture design")
+        if (sessionFiles.length == expectedPartitions) {
+          println("🎯 Perfect! Partition count matches calculation")
         } else {
-          println("⚠️  Warning: Partition count differs from expected 16")
+          println(s"⚠️  Warning: Partition count differs - Expected: $expectedPartitions, Actual: ${sessionFiles.length}")
         }
       } else {
         println("⚠️  Warning: Session directory not found for validation")

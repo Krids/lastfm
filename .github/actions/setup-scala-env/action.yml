@@ -1,6 +1,6 @@
 name: 'Setup Scala Environment'
 description: 'Setup Java 11, install SBT, and configure caching for Scala projects'
-author: 'LastFM Data Engineering Team'
+author: 'Felipe Lana Machado'
 
 inputs:
   java-version:
