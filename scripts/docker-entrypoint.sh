@@ -64,9 +64,9 @@ case "$PIPELINE" in
         echo "  - Partitions: ${SPARK_PARTITIONS:-16}"
         echo "  - Session Gap: ${SESSION_GAP_MINUTES:-20} minutes"
         echo "  - Top Sessions: ${TOP_SESSIONS:-50}"
-        echo "  - Top Tracks: ${TOP_TRACKS:-10}"
+        echo "  - Top Songs: ${TOP_SONGS:-10}"
         
         # CRITICAL: Proper SBT command quoting for runMain with environment settings
-        exec sbt -Djava.io.tmpdir=/app/tmp $SBT_OPTS -mem $MEMORY_MB "runMain com.lastfm.sessions.Main $PIPELINE"
+        exec sbt -Djava.io.tmpdir=/app/tmp $SBT_OPTS -mem $MEMORY_MB "runMain com.lastfm.Main $PIPELINE"
         ;;
 esac
